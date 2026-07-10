@@ -6,7 +6,7 @@ import { sfx, RINGERS, playRinger, syncMusic, musicPlaying } from './audio.js';
 import { streak, logSession, checkKeepsakes } from './progress.js';
 import { ic, svgStr } from './icons.js';
 import { openGuide } from './guide.js';
-import { plantSVG } from './plant.js';
+import { plantSVG, SPECIES } from './plant.js';
 import * as today from './views/today.js';
 import * as tasks from './views/tasks.js';
 import * as calendar from './views/calendar.js';
@@ -163,11 +163,11 @@ function maybeOnboard() {
     onClose: () => { if (!store.state.settings.onboarded) { store.state.settings.onboarded = true; store.save(true); } },
   });
 
-  const finish = (skillName) => {
+  const finish = (skillName, species = 'bloom') => {
     store.state.settings.onboarded = true;
     if (skillName) {
       const pretty = skillName.replace(/(^|\s)\S/g, (c) => c.toUpperCase());
-      store.state.skills.push({ id: uid(), name: pretty, icon: guessIcon(pretty), color: nextColor(), createdAt: new Date().toISOString() });
+      store.state.skills.push({ id: uid(), name: pretty, icon: guessIcon(pretty), color: nextColor(), species, createdAt: new Date().toISOString() });
       toast(`${pretty} planted! Focus on it to make it grow`, 'pot');
     } else {
       toast(`Welcome, ${store.state.settings.name}!`, 'flower');
@@ -197,11 +197,23 @@ function maybeOnboard() {
 
   const step2 = () => {
     const color = nextColor();
-    const preview = el('span', { class: 'flower', html: plantSVG({ id: 'onboard-first', color }, 1, 74) });
+    let species = 'bloom';
+    const preview = el('span', { class: 'flower', html: plantSVG({ id: 'onboard-first', color, species }, 1, 74) });
     const skillIn = el('input', { class: 'input', placeholder: 'e.g. Piano, Math, Spanish…', maxlength: 24, id: 'onboard-skill', autocomplete: 'off' });
-    const sync = () => { preview.innerHTML = plantSVG({ id: 'onboard-first', color }, skillIn.value.trim() ? 2 : 1, 74); };
+    const sync = () => { preview.innerHTML = plantSVG({ id: 'onboard-first', color, species }, skillIn.value.trim() ? 2 : 1, 74); };
     skillIn.addEventListener('input', sync);
-    skillIn.addEventListener('keydown', (e) => { if (e.key === 'Enter' && skillIn.value.trim()) finish(skillIn.value.trim()); });
+    skillIn.addEventListener('keydown', (e) => { if (e.key === 'Enter' && skillIn.value.trim()) finish(skillIn.value.trim(), species); });
+    const speciesRow = el('div', { class: 'species-row', style: { justifyContent: 'center', margin: '12px 0 0' } });
+    const renderSpecies = () => {
+      speciesRow.replaceChildren(...Object.entries(SPECIES).map(([key, sp]) => el('button', {
+        class: 'species-cell' + (key === species ? ' sel' : ''), type: 'button', title: sp.label, dataset: { sp: key },
+        onClick: () => { species = key; renderSpecies(); sync(); sfx.click(); },
+      },
+        el('div', { html: plantSVG({ id: 'ob-' + key, color, species: key }, 6, 34) }),
+        el('span', { class: 'species-name' }, sp.label),
+      )));
+    };
+    renderSpecies();
     const SUGGEST = ['Math', 'Reading', 'Piano', 'Spanish', 'Gym', 'Art', 'Coding'];
     wrap.replaceChildren(
       preview,
@@ -211,9 +223,10 @@ function maybeOnboard() {
         ...SUGGEST.map((s) => el('button', { class: 'chip chip-btn', onClick: () => { skillIn.value = s; sync(); skillIn.focus(); sfx.click(); } }, s)),
       ),
       skillIn,
+      speciesRow,
       el('button', {
-        class: 'btn btn-primary btn-big', id: 'onboard-plant-btn',
-        onClick: () => { const v = skillIn.value.trim(); if (!v) { sfx.uhoh(); skillIn.focus(); return; } finish(v); },
+        class: 'btn btn-primary btn-big', id: 'onboard-plant-btn', style: { marginTop: '14px' },
+        onClick: () => { const v = skillIn.value.trim(); if (!v) { sfx.uhoh(); skillIn.focus(); return; } finish(v, species); },
       }, ic('pot', { size: 15 }), 'Plant it'),
       el('div', { style: { marginTop: '10px' } },
         el('button', { class: 'link-btn', id: 'onboard-skip', onClick: () => finish(null) }, 'skip for now')),

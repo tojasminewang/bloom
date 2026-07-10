@@ -3,7 +3,7 @@ import { el, fmtMin, fmtDateShort, todayYmd, addDays } from '../util.js';
 import { store } from '../store.js';
 import { openModal, confirmDialog, toast } from '../ui.js';
 import { sfx } from '../audio.js';
-import { plantSVG } from '../plant.js';
+import { plantSVG, SPECIES } from '../plant.js';
 import { xpOf, levelOf, minutesTotal, weekMinutes, lastNDays, streak, skillById, gardenTier, stageName, KEEPSAKES } from '../progress.js';
 import { gardenBannerSVG, gardenSceneSVG } from '../banner.js';
 import { barChartSVG, dayLabels7 } from '../charts.js';
@@ -167,6 +167,7 @@ export function render(root) {
           : 'Every skill you practice becomes a plant. Time makes it grow.'),
       ),
       el('span', { class: 'spacer' }),
+      el('button', { class: 'btn btn-big', id: 'garden-plant-book', onClick: () => { sfx.click(); openPlantBook(); } }, ic('book', { size: 15 }), 'Plant book'),
       el('button', { class: 'btn btn-primary btn-big', id: 'garden-new-skill', onClick: () => openSkillEditor() }, ic('pot', { size: 15 }), 'Plant a skill'),
     ),
     banner,
@@ -184,6 +185,53 @@ export function render(root) {
           )),
     keepsakeShelf(),
   );
+}
+
+// ---------- plant book: every species × growth stage; unreached stages stay a mystery ----------
+const BOOK_STAGES = [
+  { name: 'sprout', lv: 1, need: 1 },
+  { name: 'bud', lv: 4, need: 3 },
+  { name: 'bloom', lv: 8, need: 7 },
+  { name: 'radiant', lv: 12, need: 10 },
+];
+const BOOK_COLORS = { bloom: '#C97F5F', sunflower: '#E0B54F', cactus: '#8FA35E', fern: '#7FA98F', bonsai: '#A9906E' };
+
+function openPlantBook() {
+  const s = store.state;
+  const maxBySpecies = {};
+  for (const sk of s.skills) {
+    const key = sk.species || 'bloom';
+    maxBySpecies[key] = Math.max(maxBySpecies[key] || 0, levelOf(sk.id).level);
+  }
+  let found = 0, total = 0;
+  const rows = Object.entries(SPECIES).map(([key, sp]) => {
+    const maxLv = maxBySpecies[key] || 0;
+    return el('div', { class: 'book-row' },
+      el('div', { class: 'book-name' },
+        el('div', {}, sp.label),
+        maxLv ? el('span', { class: 'chip lilac' }, `lv ${maxLv}`) : el('span', { class: 'muted small' }, 'not planted'),
+      ),
+      el('div', { class: 'book-stages' },
+        ...BOOK_STAGES.map((st) => {
+          total++;
+          const unlocked = st.need <= 1 || maxLv >= st.need;
+          if (unlocked) found++;
+          return el('div', {
+            class: 'book-stage', title: unlocked ? st.name : `Grow a ${sp.label.toLowerCase()} to level ${st.need} to reveal`,
+          },
+            el('div', { class: unlocked ? 'book-art' : 'book-art book-silhouette', html: plantSVG({ id: `bk-${key}-${st.lv}`, color: BOOK_COLORS[key] || '#C97F5F', species: key }, st.lv, 52) }),
+            el('div', { class: 'book-stage-label muted small' }, unlocked ? st.name : '?'),
+          );
+        }),
+      ),
+    );
+  });
+  openModal(el('div', { class: 'plant-book' },
+    el('h2', {}, 'Plant ', el('em', {}, 'book')),
+    el('p', { class: 'muted small', style: { margin: '4px 0 8px' } }, 'Every plant grows through four stages. Keep watering to reveal them all.'),
+    el('div', { style: { marginBottom: '6px' } }, el('span', { class: 'chip green' }, `${found} of ${total} discovered`)),
+    ...rows,
+  ));
 }
 
 function keepsakeShelf() {

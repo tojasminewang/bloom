@@ -547,6 +547,14 @@ details.done-details summary:hover { color: var(--ink); }
 .species-cell.sel { border-color: var(--olive); background: var(--olive-soft); }
 .species-name { font-size: 10.5px; font-weight: 700; color: var(--muted); }
 .species-cell.sel .species-name { color: var(--olive-2); }
+/* plant book: species × stages; unreached stages are silhouettes */
+.book-row { display: flex; align-items: center; gap: 14px; padding: 10px 0 6px; border-top: 1px solid var(--line); }
+.book-name { width: 88px; flex-shrink: 0; font-weight: 800; font-size: 13.5px; display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+.book-stages { display: flex; gap: 8px; flex: 1; justify-content: space-between; }
+.book-stage { text-align: center; flex: 1; min-width: 0; }
+.book-stage-label { font-size: 10px; font-weight: 700; }
+.book-silhouette svg { filter: brightness(0) opacity(0.15); }
+[data-theme="dark"] .book-silhouette svg { filter: brightness(0) invert(1) opacity(0.22); }
 .shelf-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
 .keepsake { border: 1.5px dashed var(--line-strong); border-radius: 14px; padding: 12px 12px 10px; text-align: center; opacity: 0.6; }
 .keepsake .keepsake-ic {
