@@ -41,36 +41,64 @@ const STEPS = [
 let root = null;
 
 export function endTour() {
+  delete document.documentElement.dataset.tour;
   root?.remove();
   root = null;
 }
 
 export function startTour() {
   endTour();
+  document.documentElement.dataset.tour = '1'; // router skips the entrance animation while touring
   const hole = el('div', { class: 'tour-hole' });
   const tip = el('div', { class: 'tour-tip' });
   root = el('div', { class: 'tour' }, hole, tip);
   document.body.append(root);
-  show(0);
+
+  let seq = 0; // stale-step guard: only the latest show() may touch the overlay
+
+  const placeHole = (r, snap) => {
+    const pad = 8;
+    if (snap) hole.style.transition = 'none';
+    Object.assign(hole.style, {
+      left: `${r.left - pad}px`, top: `${r.top - pad}px`,
+      width: `${r.width + pad * 2}px`, height: `${r.height + pad * 2}px`,
+    });
+    if (snap) { void hole.offsetWidth; hole.style.transition = ''; }
+  };
+
+  const placeTip = (r, side) => {
+    // beside tall targets, else below (or above when cramped) — always clamped on-screen
+    const vw = innerWidth, vh = innerHeight, m = 12;
+    const tw = tip.offsetWidth, th = tip.offsetHeight;
+    let left, top;
+    if (side === 'right' && r.right + m + tw < vw) {
+      left = r.right + m;
+      top = Math.min(Math.max(r.top + r.height / 2 - th / 2, m), vh - th - m);
+    } else {
+      left = Math.min(Math.max(r.left + r.width / 2 - tw / 2, m), vw - tw - m);
+      top = r.bottom + m + th < vh ? r.bottom + m : Math.max(r.top - th - m, m);
+    }
+    Object.assign(tip.style, { left: `${left}px`, top: `${top}px`, visibility: 'visible' });
+  };
 
   async function show(idx) {
+    const my = ++seq;
     const st = STEPS[idx];
     if (!root) return;
     if (location.hash !== st.route) {
+      // fully dim while the page swaps, so the old spotlight never frames the wrong thing
+      tip.style.visibility = 'hidden';
+      placeHole({ left: innerWidth / 2, top: innerHeight / 2, width: 0, height: 0 }, false);
       location.hash = st.route;
-      await sleep(420); // let the router render the page
-      if (!root) return;
+      await sleep(430); // let the router render the page
+      if (!root || my !== seq) return;
     }
     const target = st.target();
     if (!target) { advance(idx); return; } // section missing? just move on
     target.scrollIntoView({ block: 'center' });
     await sleep(60);
-    const r = target.getBoundingClientRect();
-    const pad = 8;
-    Object.assign(hole.style, {
-      left: `${r.left - pad}px`, top: `${r.top - pad}px`,
-      width: `${r.width + pad * 2}px`, height: `${r.height + pad * 2}px`,
-    });
+    if (!root || my !== seq) return;
+    placeHole(target.getBoundingClientRect(), false);
 
     const last = idx === STEPS.length - 1;
     tip.replaceChildren(
@@ -86,24 +114,30 @@ export function startTour() {
         }, last ? 'Start growing' : 'Next'),
       ),
     );
-    // place the bubble beside tall targets, else below (or above when cramped) — always clamped on-screen
-    const vw = innerWidth, vh = innerHeight, m = 12;
     tip.style.visibility = 'hidden';
     await sleep(10);
-    const tw = tip.offsetWidth, th = tip.offsetHeight;
-    let left, top;
-    if (st.side === 'right' && r.right + m + tw < vw) {
-      left = r.right + m;
-      top = Math.min(Math.max(r.top + r.height / 2 - th / 2, m), vh - th - m);
-    } else {
-      left = Math.min(Math.max(r.left + r.width / 2 - tw / 2, m), vw - tw - m);
-      top = r.bottom + m + th < vh ? r.bottom + m : Math.max(r.top - th - m, m);
-    }
-    Object.assign(tip.style, { left: `${left}px`, top: `${top}px`, visibility: 'visible' });
+    if (!root || my !== seq) return;
+    placeTip(target.getBoundingClientRect(), st.side);
+
+    // self-heal: after the glide settles, re-measure — if anything shifted (fonts, late
+    // layout, scroll restore), snap the spotlight into place without animating.
+    sleep(420).then(() => {
+      if (!root || my !== seq) return;
+      const fresh = st.target();
+      if (!fresh) return;
+      const r = fresh.getBoundingClientRect();
+      const h = hole.getBoundingClientRect();
+      if (Math.abs(h.left + 8 - r.left) > 2 || Math.abs(h.top + 8 - r.top) > 2 || Math.abs(h.width - 16 - r.width) > 2) {
+        placeHole(r, true);
+        placeTip(r, st.side);
+      }
+    });
   }
 
   function advance(idx) {
     if (idx + 1 >= STEPS.length) { endTour(); return; }
     show(idx + 1);
   }
+
+  show(0);
 }

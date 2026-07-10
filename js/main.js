@@ -298,6 +298,7 @@ function updateSidebarBits() {
 // (adding a task, pausing the timer…) redraw in place: no replay, no scroll jump.
 let animTimeout = null;
 function renderView(animate = false) {
+  if (document.documentElement.dataset.tour) animate = false; // tour needs stable positions to spotlight
   const scrollY = window.scrollY;
   clearTimeout(animTimeout);
   viewEl.className = animate ? 'view-anim' : '';
