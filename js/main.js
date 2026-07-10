@@ -1,6 +1,6 @@
 // main.js — boot, sidebar, router, theme, settings, onboarding, global timer tick.
-import { el, fmtClock, todayYmd, levelForXp, parseQuickLog } from './util.js';
-import { store } from './store.js';
+import { el, fmtClock, todayYmd, levelForXp, parseQuickLog, guessIcon } from './util.js';
+import { store, uid, nextColor } from './store.js';
 import { toast, openModal, confirmDialog } from './ui.js';
 import { sfx, RINGERS, playRinger, syncMusic, musicPlaying } from './audio.js';
 import { streak, logSession, checkKeepsakes } from './progress.js';
@@ -154,29 +154,74 @@ function openSettings() {
   ));
 }
 
-// ---------- onboarding ----------
+// ---------- onboarding: say hi → name → plant the first skill ----------
 function maybeOnboard() {
   if (store.state.settings.onboarded) return;
-  const nameIn = el('input', { class: 'input', value: 'Jasmine', maxlength: 24, id: 'onboard-name' });
-  const start = () => {
-    store.state.settings.name = nameIn.value.trim() || 'friend';
+
+  const wrap = el('div', { class: 'onboard' });
+  const close = openModal(wrap, {
+    onClose: () => { if (!store.state.settings.onboarded) { store.state.settings.onboarded = true; store.save(true); } },
+  });
+
+  const finish = (skillName) => {
     store.state.settings.onboarded = true;
+    if (skillName) {
+      const pretty = skillName.replace(/(^|\s)\S/g, (c) => c.toUpperCase());
+      store.state.skills.push({ id: uid(), name: pretty, icon: guessIcon(pretty), color: nextColor(), createdAt: new Date().toISOString() });
+      toast(`${pretty} planted! Focus on it to make it grow`, 'pot');
+    } else {
+      toast(`Welcome, ${store.state.settings.name}!`, 'flower');
+    }
     store.save();
     close();
-    toast(`Welcome, ${store.state.settings.name}!`, 'flower');
     setTimeout(openGuide, 350);
   };
-  nameIn.addEventListener('keydown', (e) => { if (e.key === 'Enter') start(); });
-  const close = openModal(
-    el('div', { class: 'onboard' },
+
+  const step1 = () => {
+    const nameIn = el('input', { class: 'input', placeholder: 'What should we call you?', maxlength: 24, id: 'onboard-name', autocomplete: 'off' });
+    const next = () => {
+      store.state.settings.name = nameIn.value.trim() || 'friend';
+      store.save(true);
+      step2();
+    };
+    nameIn.addEventListener('keydown', (e) => { if (e.key === 'Enter') next(); });
+    wrap.replaceChildren(
       el('span', { class: 'flower', html: plantSVG({ id: 'onboard-plant', color: '#C97F5F' }, 8, 74) }),
       el('h2', {}, 'Welcome to ', el('em', {}, 'Bloom')),
       el('p', {}, 'Tasks, calendar, notes and a focus timer — all feeding one little garden. Do the work, and watch your skills grow, level by level.'),
       nameIn,
-      el('button', { class: 'btn btn-primary btn-big', id: 'onboard-start', onClick: start }, 'Let’s grow'),
-    ),
-    { onClose: () => { if (!store.state.settings.onboarded) { store.state.settings.onboarded = true; store.save(true); } } },
-  );
+      el('button', { class: 'btn btn-primary btn-big', id: 'onboard-start', onClick: next }, 'Next'),
+    );
+    setTimeout(() => nameIn.focus(), 80);
+  };
+
+  const step2 = () => {
+    const color = nextColor();
+    const preview = el('span', { class: 'flower', html: plantSVG({ id: 'onboard-first', color }, 1, 74) });
+    const skillIn = el('input', { class: 'input', placeholder: 'e.g. Piano, Math, Spanish…', maxlength: 24, id: 'onboard-skill', autocomplete: 'off' });
+    const sync = () => { preview.innerHTML = plantSVG({ id: 'onboard-first', color }, skillIn.value.trim() ? 2 : 1, 74); };
+    skillIn.addEventListener('input', sync);
+    skillIn.addEventListener('keydown', (e) => { if (e.key === 'Enter' && skillIn.value.trim()) finish(skillIn.value.trim()); });
+    const SUGGEST = ['Math', 'Reading', 'Piano', 'Spanish', 'Gym', 'Art', 'Coding'];
+    wrap.replaceChildren(
+      preview,
+      el('h2', {}, 'Plant your first ', el('em', {}, 'plant')),
+      el('p', {}, `What do you want to spend more time on, ${store.state.settings.name}? Every minute you give it makes this little plant grow.`),
+      el('div', { class: 'row gap wrap', style: { justifyContent: 'center', marginTop: '14px' } },
+        ...SUGGEST.map((s) => el('button', { class: 'chip chip-btn', onClick: () => { skillIn.value = s; sync(); skillIn.focus(); sfx.click(); } }, s)),
+      ),
+      skillIn,
+      el('button', {
+        class: 'btn btn-primary btn-big', id: 'onboard-plant-btn',
+        onClick: () => { const v = skillIn.value.trim(); if (!v) { sfx.uhoh(); skillIn.focus(); return; } finish(v); },
+      }, ic('pot', { size: 15 }), 'Plant it'),
+      el('div', { style: { marginTop: '10px' } },
+        el('button', { class: 'link-btn', id: 'onboard-skip', onClick: () => finish(null) }, 'skip for now')),
+    );
+    setTimeout(() => skillIn.focus(), 80);
+  };
+
+  step1();
 }
 
 // ---------- music ----------
