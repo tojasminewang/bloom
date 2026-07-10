@@ -5,7 +5,7 @@ import { toast, openModal, confirmDialog } from './ui.js';
 import { sfx, RINGERS, playRinger, syncMusic, musicPlaying } from './audio.js';
 import { streak, logSession, checkKeepsakes } from './progress.js';
 import { ic, svgStr } from './icons.js';
-import { openGuide } from './guide.js';
+import { startTour } from './tour.js';
 import { plantSVG, SPECIES } from './plant.js';
 import * as today from './views/today.js';
 import * as tasks from './views/tasks.js';
@@ -174,7 +174,7 @@ function maybeOnboard() {
     }
     store.save();
     close();
-    setTimeout(openGuide, 350);
+    setTimeout(startTour, 450);
   };
 
   const step1 = () => {
@@ -276,7 +276,7 @@ function buildSidebar() {
     streakEl,
     el('span', { class: 'spacer' }),
     musicBtn,
-    el('button', { class: 'icon-btn', 'aria-label': 'Guide', id: 'guide-btn', title: 'How Bloom works', onClick: () => { sfx.click(); openGuide(); } }, ic('help', { size: 16 })),
+    el('button', { class: 'icon-btn', 'aria-label': 'Guide', id: 'guide-btn', title: 'Show me around', onClick: () => { sfx.click(); startTour(); } }, ic('help', { size: 16 })),
     themeBtn,
     el('button', { class: 'icon-btn', 'aria-label': 'Settings', id: 'settings-btn', onClick: openSettings }, ic('gear', { size: 16 })),
   ));
@@ -368,7 +368,7 @@ addEventListener('keydown', (e) => {
     else { location.hash = '#/today'; setTimeout(() => document.getElementById('quicklog')?.focus(), 90); }
   } else if (k === 'z') toggleZen();
   else if (k === 'm') toggleMusic();
-  else if (e.key === '?') openGuide();
+  else if (e.key === '?') startTour();
 });
 
 // ---------- boot ----------
