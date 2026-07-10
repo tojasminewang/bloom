@@ -99,20 +99,33 @@ function editor(n, rr, listEl) {
 
   const unwrap = (m) => { const p = m.parentNode; while (m.firstChild) p.insertBefore(m.firstChild, m); m.remove(); };
   const cleanMarks = () => {
-    // no nesting, no empty leftovers, and same-colour neighbours fuse into one smooth mark
+    // no nesting; same-colour neighbours fuse into one smooth run (even across bare spaces);
+    // empty or whitespace-only leftovers unwrap — they render as stuck little pills
     [...bodyIn.querySelectorAll('mark mark')].forEach(unwrap);
-    [...bodyIn.querySelectorAll('mark')].forEach((m) => { if (!m.textContent) m.remove(); });
     [...bodyIn.querySelectorAll('mark')].forEach((m) => {
       let next = m.nextSibling;
-      while (next && next.nodeName === 'MARK' && next.className === m.className) {
-        const dead = next;
-        next = dead.nextSibling;
-        while (dead.firstChild) m.append(dead.firstChild);
-        dead.remove();
+      while (next) {
+        if (next.nodeName === 'MARK' && next.className === m.className) {
+          while (next.firstChild) m.append(next.firstChild);
+          const dead = next;
+          next = dead.nextSibling;
+          dead.remove();
+        } else if (next.nodeType === 3 && !next.textContent.trim()
+          && next.nextSibling && next.nextSibling.nodeName === 'MARK' && next.nextSibling.className === m.className) {
+          m.append(next); // absorb the gap so the run stays continuous
+          next = m.nextSibling;
+        } else break;
       }
     });
+    [...bodyIn.querySelectorAll('mark')].forEach((m) => { if (!m.textContent.trim()) unwrap(m); });
     bodyIn.normalize();
   };
+  // heal fragmented highlights from before this hygiene existed, the moment a note opens
+  {
+    const before = bodyIn.innerHTML;
+    cleanMarks();
+    if (bodyIn.innerHTML !== before) { n.body = bodyIn.innerHTML; persist(); }
+  }
   const applyHighlight = (klass) => {
     const sel = getSelection();
     if (!sel.rangeCount || sel.isCollapsed) return;
@@ -132,9 +145,18 @@ function editor(n, rr, listEl) {
     const sel = getSelection();
     if (!sel.rangeCount) return;
     const range = sel.getRangeAt(0);
-    [...bodyIn.querySelectorAll('mark')].forEach((m) => {
-      if (range.intersectsNode(m)) unwrap(m);
-    });
+    if (sel.isCollapsed) {
+      // no selection needed — a caret inside (or beside) a highlight erases that one
+      let node = sel.anchorNode;
+      while (node && node !== bodyIn) {
+        if (node.nodeName === 'MARK') { unwrap(node); break; }
+        node = node.parentNode;
+      }
+    } else {
+      [...bodyIn.querySelectorAll('mark')].forEach((m) => {
+        if (range.intersectsNode(m)) unwrap(m);
+      });
+    }
     cleanMarks();
   };
   const toggleChecklist = () => {
