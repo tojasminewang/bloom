@@ -1,10 +1,14 @@
 // ui.js — toasts, modals, confirm dialog. No app-state imports.
 import { el } from './util.js';
+import { ic, hasIcon } from './icons.js';
 
-export function toast(msg, emoji = '✨') {
+export function toast(msg, icon = 'sprout') {
   const root = document.getElementById('toasts');
   if (!root) return;
-  const t = el('div', { class: 'toast' }, el('span', { class: 'toast-emoji' }, emoji), el('span', {}, msg));
+  const badge = hasIcon(icon)
+    ? ic(icon, { size: 15, cls: 'toast-emoji' })
+    : el('span', { class: 'toast-emoji' }, icon); // legacy fallback
+  const t = el('div', { class: 'toast' }, badge, el('span', {}, msg));
   root.append(t);
   requestAnimationFrame(() => t.classList.add('in'));
   setTimeout(() => { t.classList.remove('in'); setTimeout(() => t.remove(), 320); }, 3600);

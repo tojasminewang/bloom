@@ -15,12 +15,18 @@ export function selectNote(id) { selectedId = id; }
 function sortedNotes() {
   const q = query.trim().toLowerCase();
   let list = [...store.state.notes];
-  if (q) list = list.filter((n) => (n.title + ' ' + n.body).toLowerCase().includes(q));
+  if (q) list = list.filter((n) => (n.title + ' ' + plainText(n.body)).toLowerCase().includes(q));
   return list.sort((a, b) => Number(b.pinned) - Number(a.pinned) || (b.updatedAt || '').localeCompare(a.updatedAt || ''));
 }
 
+const plainText = (html) => {
+  const d = document.createElement('div');
+  d.innerHTML = html || '';
+  return d.textContent || '';
+};
+
 function snippet(n) {
-  const s = n.body.replace(/\s+/g, ' ').trim();
+  const s = plainText(n.body).replace(/\s+/g, ' ').trim();
   return s.length > 64 ? s.slice(0, 64) + '…' : (s || 'empty note');
 }
 
@@ -28,14 +34,14 @@ function noteCard(n, rr) {
   const sk = n.skillId ? skillById(n.skillId) : null;
   return el('button', {
     class: 'note-card' + (n.id === selectedId ? ' sel' : ''),
-    style: { '--note-color': n.color || '#D89B8A' },
+    style: { '--note-color': n.color || '#D89B8A', background: `color-mix(in srgb, ${n.color || '#D89B8A'} 10%, var(--card))` },
     dataset: { id: n.id },
     onClick: () => { selectedId = n.id; sfx.click(); rr(); },
   },
     el('div', { class: 'note-card-title' }, n.pinned ? ic('pin', { size: 12 }) : null, el('span', { class: 'note-title-text' }, n.title || 'Untitled')),
     el('div', { class: 'note-card-snippet' }, snippet(n)),
     el('div', { class: 'note-card-meta' },
-      sk ? el('span', { class: 'chip', style: { background: sk.color + '30' } }, `${sk.emoji} ${sk.name}`) : null,
+      sk ? el('span', { class: 'chip', style: { background: sk.color + '30' } }, ic((sk.icon || 'sprout'), { size: 10 }), ` ${sk.name}`) : null,
       el('span', {}, relTime(n.updatedAt || n.createdAt)),
     ),
   );
@@ -68,11 +74,79 @@ function editor(n, rr, listEl) {
     value: n.title,
     onInput: (e) => { n.title = e.target.value; persist(); },
   });
-  const bodyIn = el('textarea', {
-    id: 'note-body-in', placeholder: 'Start writing…',
-    onInput: (e) => { n.body = e.target.value; persist(); },
+  const bodyIn = el('div', {
+    id: 'note-body-in', class: 'note-body', contenteditable: 'true',
+    'data-placeholder': 'Start writing…',
+    onInput: () => { n.body = bodyIn.innerHTML; persist(); },
   });
-  bodyIn.value = n.body;
+  const escapeHtml = (t) => t.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  bodyIn.innerHTML = /<[a-z][\s\S]*>/i.test(n.body) ? n.body : escapeHtml(n.body).replace(/\n/g, '<br>');
+
+  // tap a checklist box to tick it
+  bodyIn.addEventListener('click', (e) => {
+    const li = e.target.closest('ul.checks li');
+    if (li && e.offsetX < 24 && bodyIn.contains(li)) {
+      li.classList.toggle('done');
+      n.body = bodyIn.innerHTML;
+      persist();
+    }
+  });
+
+  // ---- jotting toolbar (mousedown+preventDefault keeps the text selection) ----
+  const cmd = (fn) => (e) => { e.preventDefault(); bodyIn.focus(); fn(); n.body = bodyIn.innerHTML; persist(); };
+  const fmtBtn = (label, title, fn, cls = '') =>
+    el('button', { class: 'icon-btn fmt-btn ' + cls, title, type: 'button', onMousedown: cmd(fn) }, label);
+
+  const applyHighlight = (klass) => {
+    const sel = getSelection();
+    if (!sel.rangeCount || sel.isCollapsed) return;
+    const range = sel.getRangeAt(0);
+    if (!bodyIn.contains(range.commonAncestorContainer)) return;
+    const mark = document.createElement('mark');
+    mark.className = klass;
+    mark.append(range.extractContents());
+    range.insertNode(mark);
+    sel.removeAllRanges();
+  };
+  const clearHighlight = () => {
+    const sel = getSelection();
+    if (!sel.rangeCount) return;
+    const range = sel.getRangeAt(0);
+    [...bodyIn.querySelectorAll('mark')].forEach((m) => {
+      if (range.intersectsNode(m)) {
+        const p = m.parentNode;
+        while (m.firstChild) p.insertBefore(m.firstChild, m);
+        m.remove();
+      }
+    });
+  };
+  const toggleChecklist = () => {
+    // already in a list? just flip it between bullets and checkboxes
+    let node = getSelection().anchorNode;
+    while (node && node !== bodyIn) {
+      if (node.nodeName === 'UL') { node.classList.toggle('checks'); return; }
+      node = node.parentNode;
+    }
+    document.execCommand('insertUnorderedList');
+    node = getSelection().anchorNode;
+    while (node && node !== bodyIn) {
+      if (node.nodeName === 'UL') { node.classList.add('checks'); break; }
+      node = node.parentNode;
+    }
+  };
+
+  const toolbar = el('div', { class: 'note-toolbar' },
+    fmtBtn('B', 'Bold (⌘B)', () => document.execCommand('bold'), 'fmt-b'),
+    fmtBtn(ic('bars', { size: 14 }), 'Bullet list', () => document.execCommand('insertUnorderedList')),
+    fmtBtn('1.', 'Numbered list', () => document.execCommand('insertOrderedList'), 'fmt-b'),
+    fmtBtn(ic('check-square', { size: 14 }), 'Checklist — tap boxes to tick', toggleChecklist),
+    el('span', { class: 'fmt-sep' }),
+    fmtBtn('', 'Highlight yellow', () => applyHighlight('hl-sun'), 'hl-btn hl-sun'),
+    fmtBtn('', 'Highlight green', () => applyHighlight('hl-mint'), 'hl-btn hl-mint'),
+    fmtBtn('', 'Highlight pink', () => applyHighlight('hl-rose'), 'hl-btn hl-rose'),
+    fmtBtn('', 'Highlight blue', () => applyHighlight('hl-sky'), 'hl-btn hl-sky'),
+    fmtBtn(ic('x-circle', { size: 13 }), 'Remove highlight', clearHighlight),
+  );
 
   const swatches = el('div', { class: 'swatches' },
     ...PALETTE.slice(0, 7).map((c) => el('button', {
@@ -87,11 +161,17 @@ function editor(n, rr, listEl) {
     })),
   );
 
-  return el('div', { class: 'card note-editor' },
+  return el('div', {
+    class: 'card note-editor',
+    style: {
+      background: `color-mix(in srgb, ${n.color || '#D89B8A'} 9%, var(--card))`,
+      borderColor: `color-mix(in srgb, ${n.color || '#D89B8A'} 45%, var(--line))`,
+    },
+  },
     titleIn,
     el('div', { class: 'editor-meta' },
       skillSelect({
-        value: n.skillId || '', noneLabel: 'no plant', id: 'note-skill-in',
+        value: n.skillId || '', noneLabel: 'none', id: 'note-skill-in',
         onChange: (id) => { n.skillId = id; n.updatedAt = new Date().toISOString(); store.save(true); savedFlash(); },
       }),
       swatches,
@@ -113,6 +193,7 @@ function editor(n, rr, listEl) {
         },
       }, ic('trash', { size: 14 })),
     ),
+    toolbar,
     bodyIn,
   );
 }

@@ -8,6 +8,7 @@ export const fromYmd = (s) => { const [y, m, d] = s.split('-').map(Number); retu
 export const todayYmd = () => ymd(new Date());
 export const addDays = (s, n) => { const d = fromYmd(s); d.setDate(d.getDate() + n); return ymd(d); };
 export const dayDiff = (a, b) => Math.round((fromYmd(b) - fromYmd(a)) / 86400000);
+export const weekStart = (s = todayYmd()) => addDays(s, -((fromYmd(s).getDay() + 6) % 7)); // Monday of that week
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -40,6 +41,31 @@ export const relDue = (s) => {
   if (diff < 7) return fmtDate(s).split(', ')[0]; // weekday name
   return fmtDateShort(s);
 };
+export const fmtTime = (hhmm, h24 = false) => {
+  if (!hhmm) return '';
+  if (h24) return hhmm;
+  let [h, m] = hhmm.split(':').map(Number);
+  const ap = h >= 12 ? 'pm' : 'am';
+  h = h % 12 || 12;
+  return `${h}:${pad2(m)} ${ap}`;
+};
+// "7pm" / "7:30 pm" / "19:30" → "HH:MM". null = blank (all-day), undefined = can't parse.
+export function parseTimeInput(str) {
+  const t = (str || '').trim().toLowerCase();
+  if (!t) return null;
+  const m = t.match(/^(\d{1,2})(?:[:.](\d{2}))?\s*(am|pm|a|p)?\.?$/);
+  if (!m) return undefined;
+  let h = +m[1];
+  const min = m[2] ? +m[2] : 0;
+  const ap = m[3];
+  if (min > 59) return undefined;
+  if (ap) {
+    if (h < 1 || h > 12) return undefined;
+    if (ap.startsWith('p') && h !== 12) h += 12;
+    if (ap.startsWith('a') && h === 12) h = 0;
+  } else if (h > 23) return undefined;
+  return `${pad2(h)}:${pad2(min)}`;
+}
 export const relTime = (iso) => {
   const ms = Date.now() - new Date(iso).getTime();
   const min = Math.floor(ms / 60000);
@@ -58,7 +84,12 @@ export function el(tag, attrs = {}, ...children) {
     if (k === 'class') node.className = v;
     else if (k === 'html') node.innerHTML = v;
     else if (k.startsWith('on') && typeof v === 'function') node.addEventListener(k.slice(2).toLowerCase(), v);
-    else if (k === 'style' && typeof v === 'object') Object.assign(node.style, v);
+    else if (k === 'style' && typeof v === 'object') {
+      for (const [sk, sv] of Object.entries(v)) {
+        if (sk.startsWith('--')) node.style.setProperty(sk, sv); // custom props need setProperty
+        else node.style[sk] = sv;
+      }
+    }
     else if (k === 'dataset') Object.assign(node.dataset, v);
     else if (k === 'value') node.value = v;
     else if (k === 'checked') node.checked = v;
@@ -92,8 +123,10 @@ export function levelForXp(xp) {
 }
 
 // "1h math", "45m spanish yesterday", "1h 30m piano 2026-07-01" → {minutes, date, name, skill}
+// opts.skill: a chosen plant to log against — then the name in the text is optional.
 const FILLERS = new Set(['of', 'on', 'for', 'doing', 'i', 'did', 'me', 'my', 'a', 'an', 'the', 'spent', 'practicing', 'practiced', 'studying', 'studied', 'was', 'been', 'just']);
-export function parseQuickLog(text, skills) {
+export function parseQuickLog(text, skills, opts = {}) {
+  const forced = opts.skill || null;
   let t = ' ' + (text || '').trim().toLowerCase() + ' ';
   if (!t.trim()) return null;
   let date = todayYmd();
@@ -105,6 +138,7 @@ export function parseQuickLog(text, skills) {
   t = t.replace(/(\d+(?:\.\d+)?)\s*h(?:ours?|rs?)?\b/g, (_, n) => { minutes += Math.round(parseFloat(n) * 60); return ' '; });
   t = t.replace(/(\d+)\s*m(?:in(?:ute)?s?)?\b/g, (_, n) => { minutes += parseInt(n, 10); return ' '; });
   if (!minutes || minutes > 24 * 60) return null;
+  if (forced) return { minutes, date, name: forced.name, skill: forced };
   const name = t.split(/\s+/).filter((w) => w && !FILLERS.has(w)).join(' ').trim();
   if (!name) return null;
   const pretty = name.replace(/(^|\s)\S/g, (c) => c.toUpperCase());
@@ -139,32 +173,30 @@ export function eventOccursOn(ev, date) {
   return false;
 }
 
-export function guessEmoji(name) {
+export function guessIcon(name) {
   const n = name.toLowerCase();
   const map = [
-    [/math|calc|algebra|geometr|trig/, '📐'],
-    [/read|book|novel/, '📚'],
-    [/code|coding|program|dev|python|javascript|swift/, '💻'],
-    [/spanish|french|language|english|japanese|korean|chinese|german|italian/, '🗣️'],
-    [/piano|keyboard/, '🎹'],
-    [/guitar|ukulele/, '🎸'],
-    [/music|sing|voice|violin|drum/, '🎵'],
-    [/gym|workout|lift|fitness|exercise/, '💪'],
-    [/run|jog|cardio/, '🏃‍♀️'],
-    [/yoga|stretch|meditat/, '🧘‍♀️'],
-    [/art|draw|paint|sketch|design/, '🎨'],
-    [/write|writing|journal|essay|blog/, '✍️'],
-    [/science|physics|chem|bio|lab/, '🔬'],
-    [/study|school|exam|homework|class|course/, '🎓'],
-    [/cook|bake|recipe/, '🍳'],
-    [/game|unity|phaser|godot/, '🎮'],
-    [/business|shop|store|dropship|marketing/, '💼'],
-    [/video|edit|youtube|film|short/, '🎬'],
-    [/dance|ballet/, '💃'],
-    [/swim/, '🏊‍♀️'],
-    [/chess/, '♟️'],
-    [/photo/, '📷'],
+    [/math|calc|algebra|geometr|trig|physic/, 'calc'],
+    [/read|book|novel|liter/, 'book'],
+    [/code|coding|program|dev|python|javascript|swift/, 'code'],
+    [/spanish|french|language|english|japanese|korean|chinese|german|italian/, 'globe'],
+    [/piano|keyboard|guitar|ukulele|music|sing|voice|violin|drum/, 'music'],
+    [/gym|workout|lift|fitness|exercise/, 'dumbbell'],
+    [/run|jog|cardio|swim|soccer|basket|tennis|sport/, 'ball'],
+    [/yoga|stretch|meditat|journal.*grat|selfcare|self-care/, 'heart'],
+    [/art|draw|paint|sketch|design/, 'palette'],
+    [/write|writing|journal|essay|blog/, 'pencil'],
+    [/science|chem|bio|lab/, 'flask'],
+    [/study|school|exam|homework|class|course/, 'cap'],
+    [/cook|bake|recipe/, 'pan'],
+    [/game|unity|phaser|godot/, 'gamepad'],
+    [/business|shop|store|dropship|marketing/, 'briefcase'],
+    [/video|edit|youtube|film|short/, 'film'],
+    [/dance|ballet|perform/, 'star'],
+    [/chess|strateg|aim|goal/, 'target'],
+    [/photo|camera/, 'camera'],
+    [/talk|speech|debate/, 'chat'],
   ];
-  for (const [re, e] of map) if (re.test(n)) return e;
-  return '🌿';
+  for (const [re, icon] of map) if (re.test(n)) return icon;
+  return 'sprout';
 }

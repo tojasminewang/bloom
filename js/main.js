@@ -2,8 +2,8 @@
 import { el, fmtClock, todayYmd, levelForXp, parseQuickLog } from './util.js';
 import { store } from './store.js';
 import { toast, openModal, confirmDialog } from './ui.js';
-import { sfx, RINGERS, playRinger } from './audio.js';
-import { streak, logSession } from './progress.js';
+import { sfx, RINGERS, playRinger, syncMusic, musicPlaying } from './audio.js';
+import { streak, logSession, checkKeepsakes } from './progress.js';
 import { ic, svgStr } from './icons.js';
 import { openGuide } from './guide.js';
 import { plantSVG } from './plant.js';
@@ -26,7 +26,7 @@ const NAV = [
 ];
 
 let currentView = null;
-let timerChip, streakEl, themeBtn;
+let timerChip, streakEl, themeBtn, musicBtn;
 const viewEl = document.getElementById('view');
 
 // ---------- theme (cream by default; night forest is opt-in) ----------
@@ -41,7 +41,7 @@ function cycleTheme() {
   store.save(true);
   applyTheme();
   sfx.click();
-  toast(store.state.settings.theme === 'dark' ? 'Night garden' : 'Day garden', store.state.settings.theme === 'dark' ? '🌙' : '☀️');
+  toast(store.state.settings.theme === 'dark' ? 'Night garden' : 'Day garden', store.state.settings.theme === 'dark' ? 'moon' : 'sun');
 }
 
 // ---------- settings ----------
@@ -64,9 +64,22 @@ function openSettings() {
       store.save(true);
       soundChip.classList.toggle('sel', s.sound);
       soundChip.replaceChildren(ic(s.sound ? 'bell' : 'bell-off', { size: 12 }), soundLabel());
+      syncMusic();
       sfx.pop();
     },
   }, ic(s.sound ? 'bell' : 'bell-off', { size: 12 }), soundLabel());
+
+  const hourRow = el('div', { class: 'row gap' });
+  const hourChips = [[false, '12-hour · 3:00 pm'], [true, '24-hour · 15:00']].map(([v, label]) => el('button', {
+    class: 'chip chip-btn' + (!!s.hour24 === v ? ' sel' : ''),
+    dataset: { h24: String(v) },
+    onClick: () => {
+      s.hour24 = v;
+      store.save(); // not silent — every visible time flips format instantly
+      hourChips.forEach((c) => c.classList.toggle('sel', c.dataset.h24 === String(v)));
+    },
+  }, label));
+  hourRow.append(...hourChips);
 
   const ringerRow = el('div', { class: 'row gap wrap' });
   const ringerChips = Object.entries(RINGERS).map(([key, r]) => el('button', {
@@ -86,7 +99,7 @@ function openSettings() {
     const a = el('a', { href: URL.createObjectURL(blob), download: `bloom-backup-${todayYmd()}.json` });
     a.click();
     URL.revokeObjectURL(a.href);
-    toast('Backup downloaded', '💾');
+    toast('Backup downloaded', 'download');
   }
 
   const fileIn = el('input', {
@@ -100,10 +113,10 @@ function openSettings() {
         if (await confirmDialog('Replace everything with this backup? Current data is overwritten.', { yes: 'Import', danger: false })) {
           store.replace(data);
           close();
-          toast('Backup restored 🌸', '💾');
+          toast('Backup restored', 'flower');
         }
       } catch {
-        toast('That file isn’t a Bloom backup', '😕');
+        toast('That file isn’t a Bloom backup', 'x-circle');
       }
     },
   });
@@ -116,6 +129,8 @@ function openSettings() {
     themeRow,
     el('div', { class: 'field-label' }, 'Sounds'),
     soundChip,
+    el('div', { class: 'field-label' }, 'Time format'),
+    hourRow,
     el('div', { class: 'field-label' }, 'Timer ringer'),
     ringerRow,
     el('p', { class: 'muted small', style: { marginTop: '6px' } }, 'Tap one to hear it — it plays when a focus session finishes.'),
@@ -148,7 +163,7 @@ function maybeOnboard() {
     store.state.settings.onboarded = true;
     store.save();
     close();
-    toast(`Welcome, ${store.state.settings.name}!`, '🌸');
+    toast(`Welcome, ${store.state.settings.name}!`, 'flower');
     setTimeout(openGuide, 350);
   };
   nameIn.addEventListener('keydown', (e) => { if (e.key === 'Enter') start(); });
@@ -162,6 +177,22 @@ function maybeOnboard() {
     ),
     { onClose: () => { if (!store.state.settings.onboarded) { store.state.settings.onboarded = true; store.save(true); } } },
   );
+}
+
+// ---------- music ----------
+function updateMusicBtn() {
+  if (!musicBtn) return;
+  const on = store.state.settings.music !== false;
+  musicBtn.innerHTML = svgStr(on ? 'music' : 'music-off', 16);
+  musicBtn.style.color = on ? '' : 'var(--line-strong)';
+}
+function toggleMusic() {
+  store.state.settings.music = store.state.settings.music === false;
+  store.save(true);
+  syncMusic();
+  updateMusicBtn();
+  sfx.click();
+  toast(store.state.settings.music ? 'Music on' : 'Music off', store.state.settings.music ? 'music' : 'music-off');
 }
 
 // ---------- sidebar ----------
@@ -181,9 +212,12 @@ function buildSidebar() {
   aside.append(timerChip);
   streakEl = el('span', { class: 'streak-mini' });
   themeBtn = el('button', { class: 'icon-btn', 'aria-label': 'Toggle theme', onClick: cycleTheme });
+  musicBtn = el('button', { class: 'icon-btn', 'aria-label': 'Toggle music', id: 'music-btn', title: 'Background music (m)', onClick: toggleMusic });
+  updateMusicBtn();
   aside.append(el('div', { class: 'sidebar-foot' },
     streakEl,
     el('span', { class: 'spacer' }),
+    musicBtn,
     el('button', { class: 'icon-btn', 'aria-label': 'Guide', id: 'guide-btn', title: 'How Bloom works', onClick: () => { sfx.click(); openGuide(); } }, ic('help', { size: 16 })),
     themeBtn,
     el('button', { class: 'icon-btn', 'aria-label': 'Settings', id: 'settings-btn', onClick: openSettings }, ic('gear', { size: 16 })),
@@ -195,7 +229,10 @@ function updateNav() {
 }
 function updateSidebarBits() {
   const st = streak();
-  if (streakEl) streakEl.replaceChildren(ic(st > 0 ? 'flame' : 'sprout', { size: 12 }), ` ${st > 0 ? `${st} days` : 'no streak'}`);
+  if (streakEl) {
+    streakEl.replaceChildren(ic(st > 0 ? 'flame' : 'sprout', { size: 12 }), ` ${st}`);
+    streakEl.title = `${st} day streak`;
+  }
 }
 
 // ---------- router / render ----------
@@ -228,7 +265,7 @@ let renderQueued = false;
 store.subscribe(() => {
   if (renderQueued) return;
   renderQueued = true;
-  queueMicrotask(() => { renderQueued = false; renderView(false); });
+  queueMicrotask(() => { renderQueued = false; renderView(false); checkKeepsakes(); });
 });
 
 // ---------- global tick: timer completion + chip + tab title ----------
@@ -272,6 +309,7 @@ addEventListener('keydown', (e) => {
     if (q) q.focus();
     else { location.hash = '#/today'; setTimeout(() => document.getElementById('quicklog')?.focus(), 90); }
   } else if (k === 'z') toggleZen();
+  else if (k === 'm') toggleMusic();
   else if (e.key === '?') openGuide();
 });
 
@@ -281,6 +319,8 @@ buildSidebar();
 applyTheme();
 route();
 maybeOnboard();
+syncMusic(); // gentle garden music, on by default (starts after first click per browser rules)
+setTimeout(checkKeepsakes, 800);
 
 // Console/testing hooks (local only)
 if (['localhost', '127.0.0.1'].includes(location.hostname)) {

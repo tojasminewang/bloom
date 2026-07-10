@@ -6,7 +6,7 @@ import { extname, join, normalize } from 'path';
 import { fileURLToPath } from 'url';
 
 const ROOT = fileURLToPath(new URL('.', import.meta.url));
-const PORT = 5190;
+const PORT = Number(process.env.PORT) || 5190;
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',

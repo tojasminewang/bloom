@@ -36,7 +36,7 @@ function pages() {
       title: ['Three ways to ', el('em', {}, 'water')],
       body: el('div', {},
         iconLine('hourglass', 'Focus timer', 'Pick a plant, pick 15–60 minutes, press start. When the ring completes, the minutes are logged for you.'),
-        iconLine('bolt', 'Quick log', 'Type it like you’d say it — Bloom understands.'),
+        iconLine('bolt', 'Add time', 'Practiced away from the timer? Type what you did, in plain words, into any “Add time” box — it still counts.'),
         el('div', { class: 'row gap wrap', style: { margin: '2px 0 12px 40px' } },
           el('span', { class: 'chip green' }, '“1h math”'),
           el('span', { class: 'chip green' }, '“30m spanish yesterday”'),
@@ -53,7 +53,7 @@ function pages() {
         iconLine('calendar', 'Calendar', 'Events, task due-dates and green focus dots all land on the month view. Click any day to plan it.'),
         iconLine('note', 'Notes', 'Autosaving notes you can link to a plant — find them again from the plant’s details.'),
         iconLine('sun', 'Today', 'Your morning page: today’s plan, quick log, this week’s chart and what’s up next.'),
-        el('p', { class: 'muted small', style: { marginTop: '10px' } }, 'Shortcuts: 1–6 switch pages · T new task · L quick log · F focus · Z zen · ? this guide. Tasks and events can repeat daily, weekly or monthly.'),
+        el('p', { class: 'muted small', style: { marginTop: '10px' } }, 'Shortcuts: 1–6 switch pages · T new task · L add time · F focus · Z zen · ? this guide. Tasks and events can repeat daily, weekly or monthly.'),
       ),
     },
     {

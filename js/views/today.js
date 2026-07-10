@@ -1,5 +1,5 @@
 // views/today.js — dashboard: greeting, stats, today's plan, quick log, up next, garden peek.
-import { el, todayYmd, fmtMin, fmtLongDate, ymd, addDays, relDue, eventOccursOn } from '../util.js';
+import { el, todayYmd, fmtMin, fmtLongDate, fmtTime, fmtDateShort, fromYmd, ymd, addDays, relDue, weekStart, eventOccursOn, pad2 } from '../util.js';
 import { ic } from '../icons.js';
 import { store, uid } from '../store.js';
 import { sfx } from '../audio.js';
@@ -8,6 +8,126 @@ import { barChartSVG, dayLabels7 } from '../charts.js';
 import { plantSVG } from '../plant.js';
 import { taskRow } from './tasks.js';
 import { quickLogBox } from '../quicklog.js';
+
+let chartRange = 'week'; // week | month | year — survives re-renders
+
+// focus chart with a range switcher and the range's total
+function focusChartCard(s) {
+  const today = todayYmd();
+  let values, labels, titles = null;
+  if (chartRange === 'week') {
+    values = lastNDays(7);
+    labels = dayLabels7();
+    const WD = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    titles = [];
+    for (let i = 6; i >= 0; i--) {
+      const ds = addDays(today, -i);
+      titles.push(i === 0 ? 'Today' : `${WD[fromYmd(ds).getDay()]}, ${fmtDateShort(ds)}`);
+    }
+  } else if (chartRange === 'month') {
+    values = lastNDays(30);
+    labels = []; titles = [];
+    for (let i = 29; i >= 0; i--) {
+      const d = addDays(today, -i);
+      titles.push(fmtDateShort(d));
+      labels.push(i % 5 === 0 ? d.slice(8).replace(/^0/, '') : '');
+    }
+  } else {
+    const MO = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const now = new Date();
+    const byMonth = new Map();
+    labels = []; titles = [];
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`;
+      byMonth.set(key, 0);
+      labels.push(MO[d.getMonth()][0]);
+      titles.push(`${MO[d.getMonth()]} ${d.getFullYear()}`);
+    }
+    for (const sess of s.sessions) {
+      const key = sess.date.slice(0, 7);
+      if (byMonth.has(key)) byMonth.set(key, byMonth.get(key) + sess.minutes);
+    }
+    values = [...byMonth.values()];
+  }
+  const total = values.reduce((a, b) => a + b, 0);
+  const rangeChip = (key, label) => el('button', {
+    class: 'chip chip-btn' + (chartRange === key ? ' sel' : ''),
+    onClick: () => { chartRange = key; sfx.click(); store.notify(); },
+  }, label);
+  return el('div', { class: 'card' },
+    el('div', { class: 'card-title' }, el('h2', {}, 'Your ', el('em', {}, 'focus')), ic('bars', { size: 15, cls: 'title-ic' }),
+      el('span', { class: 'spacer' }),
+      rangeChip('week', 'week'), rangeChip('month', 'month'), rangeChip('year', 'year'),
+    ),
+    focusChartWithTip(values, labels, titles),
+    el('p', { class: 'muted small', style: { marginTop: '8px' } },
+      total ? `${fmtMin(total)} focused this ${chartRange}` : `nothing this ${chartRange} yet — the bars are waiting`),
+  );
+}
+
+// bar chart wrapped with a styled tooltip that follows the hovered column
+function focusChartWithTip(values, labels, titles) {
+  const wrap = el('div', { class: 'chart-tip-wrap', html: barChartSVG(values, labels, { maxW: chartRange === 'week' ? 340 : 420, titles }) });
+  const tip = el('div', { class: 'chart-tip' });
+  wrap.append(tip);
+  wrap.addEventListener('mousemove', (e) => {
+    const col = e.target.closest('.bar-col');
+    if (!col) { tip.classList.remove('show'); return; }
+    const min = +col.dataset.min;
+    tip.textContent = `${col.dataset.tip} · ${min ? `${fmtMin(min)} focused` : 'no focus'}`;
+    const wb = wrap.getBoundingClientRect();
+    const b = col.querySelector('.bar-rect').getBoundingClientRect();
+    tip.style.left = `${b.x - wb.x + b.width / 2}px`;
+    tip.style.top = `${Math.min(b.y - wb.y, wrap.clientHeight * 0.5) - 7}px`;
+    tip.classList.add('show');
+  });
+  wrap.addEventListener('mouseleave', () => tip.classList.remove('show'));
+  return wrap;
+}
+
+// a simple weekly checklist — add things for the week, they stay all week, check them off
+function weekTasksCard(s) {
+  const wk = weekStart();
+  const tasks = s.weeklyTasks.filter((t) => t.week === wk)
+    .sort((a, b) => Number(a.done) - Number(b.done) || a.createdAt.localeCompare(b.createdAt));
+  const done = tasks.filter((t) => t.done).length;
+
+  const addIn = el('input', {
+    class: 'input', id: 'week-task-in', placeholder: '＋ Add something for this week…', autocomplete: 'off',
+    onKeydown: (e) => {
+      if (e.key === 'Enter' && e.target.value.trim()) {
+        s.weeklyTasks.push({ id: uid(), title: e.target.value.trim(), done: false, doneAt: null, week: wk, createdAt: new Date().toISOString() });
+        sfx.click();
+        store.save();
+      }
+    },
+  });
+
+  const row = (t) => el('div', { class: 'task-row' + (t.done ? ' done' : ''), dataset: { id: t.id } },
+    el('button', {
+      class: 'check' + (t.done ? ' on' : ''), role: 'checkbox', 'aria-checked': String(!!t.done),
+      'aria-label': (t.done ? 'Uncheck ' : 'Done ') + t.title,
+      onClick: () => { t.done = !t.done; t.doneAt = t.done ? new Date().toISOString() : null; t.done ? sfx.pop() : sfx.click(); store.save(); },
+    }, el('span', { class: 'checkmark' }, '✓')),
+    el('div', { class: 'task-main' }, el('span', { class: 'task-title' }, t.title)),
+    el('div', { class: 'task-actions' },
+      el('button', {
+        class: 'icon-btn', 'aria-label': 'Delete',
+        onClick: () => { s.weeklyTasks = s.weeklyTasks.filter((x) => x.id !== t.id); store.save(); },
+      }, ic('trash', { size: 14 }))),
+  );
+
+  return el('div', { class: 'card' },
+    el('div', { class: 'card-title' }, el('h2', {}, 'This ', el('em', {}, 'week')), ic('check-square', { size: 15, cls: 'title-ic' }),
+      el('span', { class: 'spacer' }),
+      tasks.length ? el('span', { class: 'chip lilac' }, `${done}/${tasks.length}`) : null),
+    tasks.length
+      ? el('div', {}, ...tasks.map(row))
+      : el('p', { class: 'muted small', style: { padding: '2px 4px 8px' } }, 'What do you want to get done this week?'),
+    el('div', { style: { marginTop: '8px' } }, addIn),
+  );
+}
 
 function greeting() {
   const h = new Date().getHours();
@@ -21,7 +141,7 @@ const SUBS = [
   'Small steps, every day — that’s how gardens grow.',
   'What are you growing today?',
   'One focused hour beats a busy day.',
-  'Your plants are rooting for you 🌱',
+  'Your plants are rooting for you.',
   'Water something today — future you says thanks.',
 ];
 
@@ -44,9 +164,9 @@ export function render(root) {
 
   const doneToday = tasksDoneOn(today);
 
-  // -------- today's plan (overdue + due today + today's events, incl. repeating) --------
-  const planTasks = s.tasks.filter((t) => !t.done && t.due && t.due <= today)
-    .sort((a, b) => (a.due || '').localeCompare(b.due || '') || b.priority - a.priority);
+  // -------- today's plan: strictly today (overdue lives in Tasks) --------
+  const planTasks = s.tasks.filter((t) => !t.done && t.due === today)
+    .sort((a, b) => b.priority - a.priority || a.createdAt.localeCompare(b.createdAt));
   const eventsToday = s.events.filter((e) => eventOccursOn(e, today)).sort((a, b) => (a.time || '').localeCompare(b.time || ''));
 
   const quickAdd = el('input', {
@@ -67,12 +187,12 @@ export function render(root) {
       ? el('div', { style: { marginBottom: '10px' } },
           ...eventsToday.map((ev) => el('div', { class: 'event-row' },
             el('div', { class: 'event-bar', style: { background: ev.color } }),
-            el('span', { class: 'event-time' }, ev.time || 'all day'),
+            el('span', { class: 'event-time' }, ev.time ? fmtTime(ev.time, s.settings.hour24) : 'all day'),
             el('span', { class: 'event-title' }, ev.title),
           )))
       : null,
     planTasks.length
-      ? el('div', {}, ...planTasks.map((t) => taskRow(t)))
+      ? el('div', {}, ...planTasks.map((t) => taskRow(t, { showDue: false })))
       : el('div', { class: 'empty', style: { margin: '4px 0 10px' } }, el('span', { class: 'big' }, ic('leaf', { size: 26 })), 'Nothing due today — a fresh page.'),
     el('div', { style: { marginTop: '10px' } }, quickAdd),
   );
@@ -90,19 +210,18 @@ export function render(root) {
             const lv = levelOf(sk.id);
             return el('a', { href: '#/garden', style: { textAlign: 'center', color: 'inherit' } },
               el('div', { html: plantSVG(sk, lv.level, 74) }),
-              el('div', { style: { fontWeight: '800', fontSize: '12.5px' } }, `${sk.emoji} ${sk.name}`),
+              el('div', { class: 'row', style: { fontWeight: '800', fontSize: '12.5px', justifyContent: 'center', gap: '5px' } }, ic((sk.icon || 'sprout'), { size: 12, cls: 'title-ic' }), sk.name),
               el('div', { class: 'muted small' }, `Lv ${lv.level} · ${fmtMin(weekMinutes(sk.id))} this wk`),
             );
           }))
-      : el('div', { class: 'empty' }, el('span', { class: 'big' }, ic('pot', { size: 26 })), 'No plants yet — log some time below or visit the garden.'),
+      : el('div', { class: 'empty' }, el('span', { class: 'big' }, ic('pot', { size: 26 })), 'No plants yet — add some time below or visit the garden.'),
   );
 
-  // -------- up next (7 days of events incl. repeats + due tasks) --------
+  // -------- up next (7 days of events incl. repeats — tasks live in the week card) --------
   const nextItems = [];
   for (let i = 1; i <= 7; i++) {
     const d = addDays(today, i);
-    for (const e of s.events) if (eventOccursOn(e, d)) nextItems.push({ date: d, time: e.time, title: e.title, color: e.color, kind: 'event' });
-    for (const t of s.tasks) if (!t.done && t.due === d) nextItems.push({ date: d, time: null, title: t.title, color: null, kind: 'task' });
+    for (const e of s.events) if (eventOccursOn(e, d)) nextItems.push({ date: d, time: e.time, title: e.title, color: e.color });
   }
   nextItems.sort((a, b) => a.date.localeCompare(b.date) || (a.time || '').localeCompare(b.time || ''));
   nextItems.length = Math.min(nextItems.length, 5);
@@ -113,8 +232,8 @@ export function render(root) {
       ? el('div', {}, ...nextItems.map((it) => el('div', { class: 'event-row' },
           el('div', { class: 'event-bar', style: { background: it.color || 'var(--track)' } }),
           el('span', { class: 'event-time' }, relDue(it.date)),
-          el('span', { class: 'event-title' }, (it.kind === 'task' ? '☐ ' : '') + it.title),
-          it.time ? el('span', { class: 'chip' }, it.time) : null,
+          el('span', { class: 'event-title' }, it.title),
+          it.time ? el('span', { class: 'chip' }, fmtTime(it.time, s.settings.hour24)) : null,
         )))
       : el('p', { class: 'muted small', style: { padding: '2px 4px' } }, 'A clear week ahead.'),
   );
@@ -139,17 +258,13 @@ export function render(root) {
       stat('sprout', 'sun-soft', fmtMin(weekMinutes()), 'grown this week'),
     ),
     el('div', { class: 'grid-2' },
-      el('div', { class: 'col' }, planCard, peek),
+      el('div', { class: 'col' }, planCard, weekTasksCard(s), peek),
       el('div', { class: 'col' },
         el('div', { class: 'card' },
-          el('div', { class: 'card-title' }, el('h2', {}, 'Quick ', el('em', {}, 'log')), ic('bolt', { size: 15, cls: 'title-ic' })),
+          el('div', { class: 'card-title' }, el('h2', {}, 'Add ', el('em', {}, 'time')), ic('bolt', { size: 15, cls: 'title-ic' })),
           quickLogBox(),
         ),
-        el('div', { class: 'card' },
-          el('div', { class: 'card-title' }, el('h2', {}, 'This ', el('em', {}, 'week')), ic('bars', { size: 15, cls: 'title-ic' }), el('span', { class: 'spacer' }),
-            el('span', { class: 'chip green' }, fmtMin(weekMinutes()))),
-          el('div', { html: barChartSVG(lastNDays(7), dayLabels7(), { maxW: 340 }) }),
-        ),
+        focusChartCard(s),
         upNext,
       ),
     ),

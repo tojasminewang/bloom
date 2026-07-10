@@ -37,8 +37,31 @@ const P = {
   help: '<circle cx="12" cy="12" r="8.4"/><path d="M9.7 9.6a2.4 2.4 0 1 1 3.4 2.7c-.8.4-1.1 1-1.1 1.9M12 17.2h.01"/>',
   repeat: '<path d="M17.6 4.6l2.8 2.8-2.8 2.8"/><path d="M4.4 11V9.9a2.5 2.5 0 0 1 2.5-2.5h13.3"/><path d="M6.4 19.4l-2.8-2.8 2.8-2.8"/><path d="M19.6 13v1.1a2.5 2.5 0 0 1-2.5 2.5H3.8"/>',
   expand: '<path d="M9 4.5H4.5V9M15 4.5h4.5V9M9 19.5H4.5V15M15 19.5h4.5V15"/>',
+  pip: '<rect x="3.4" y="5" width="17.2" height="14" rx="3"/><rect x="11.5" y="11.5" width="6.5" height="5" rx="1.4" fill="currentColor" stroke="none"/>',
   'x-circle': '<circle cx="12" cy="12" r="8.4"/><path d="M9.3 9.3l5.4 5.4M14.7 9.3l-5.4 5.4"/>',
+  music: '<path d="M9.4 17.4V6.6l9.2-2v10.8"/><circle cx="6.9" cy="17.5" r="2.5"/><circle cx="16.1" cy="15.3" r="2.5"/>',
+  'music-off': '<path d="M9.4 17.4V6.6l9.2-2v10.8"/><circle cx="6.9" cy="17.5" r="2.5"/><circle cx="16.1" cy="15.3" r="2.5"/><path d="M4.2 4.2l15.6 15.6"/>',
+  // subject icons for plants
+  calc: '<rect x="5" y="3.6" width="14" height="16.8" rx="3"/><path d="M8.5 7.6h7M8.5 12h.01M12 12h.01M15.5 12h.01M8.5 15.6h.01M12 15.6h.01M15.5 15.6h.01"/>',
+  book: '<path d="M12 6.4C10.5 5 8.5 4.4 5.5 4.4v13.2c3 0 5 .6 6.5 2 1.5-1.4 3.5-2 6.5-2V4.4c-3 0-5 .6-6.5 2z"/><path d="M12 6.4v13.2"/>',
+  code: '<path d="M8.5 7.5L4 12l4.5 4.5M15.5 7.5L20 12l-4.5 4.5"/>',
+  globe: '<circle cx="12" cy="12" r="8.4"/><path d="M3.6 12h16.8M12 3.6c2.6 2.3 3.9 5.1 3.9 8.4s-1.3 6.1-3.9 8.4c-2.6-2.3-3.9-5.1-3.9-8.4s1.3-6.1 3.9-8.4z"/>',
+  dumbbell: '<path d="M7 8.5v7M4.4 10v4M17 8.5v7M19.6 10v4M7 12h10"/>',
+  palette: '<path d="M12 3.6a8.4 8.4 0 1 0 0 16.8c1.3 0 1.9-.8 1.9-1.7 0-.8-.5-1.3-.5-2 0-1 .8-1.7 1.9-1.7h1.9a3.2 3.2 0 0 0 3.2-3.2c0-4.6-3.8-8.2-8.4-8.2z"/><path d="M8 10.2h.01M12 7.6h.01M16 10.2h.01"/>',
+  flask: '<path d="M9.6 3.6h4.8M10.6 3.6v5.2L5.5 18a2 2 0 0 0 1.8 2.9h9.4a2 2 0 0 0 1.8-2.9l-5.1-9.2V3.6"/><path d="M8.2 14.6h7.6"/>',
+  cap: '<path d="M12 4.6L21 9l-9 4.4L3 9z"/><path d="M6.5 11.2v4.2c0 1.4 2.5 2.8 5.5 2.8s5.5-1.4 5.5-2.8v-4.2M21 9v4.4"/>',
+  pan: '<circle cx="10.5" cy="14" r="5.6"/><path d="M16.1 14h4.3M10.5 5.4v1.8M7.6 4.8l.7 1.7M13.4 4.8l-.7 1.7"/>',
+  gamepad: '<rect x="3.6" y="8" width="16.8" height="9" rx="4.5"/><path d="M8 10.8v3.4M6.3 12.5h3.4M15.2 11.2h.01M17.4 13.6h.01"/>',
+  film: '<rect x="4" y="4.6" width="16" height="14.8" rx="3"/><path d="M8.2 4.6v14.8M15.8 4.6v14.8M4 9.2h4.2M4 14.8h4.2M15.8 9.2H20M15.8 14.8H20"/>',
+  ball: '<circle cx="12" cy="12" r="8.4"/><path d="M5.2 7a10.6 10.6 0 0 1 0 10M18.8 7a10.6 10.6 0 0 0 0 10"/>',
+  camera: '<rect x="3.6" y="7.2" width="16.8" height="12.6" rx="3.4"/><path d="M8.6 7.2L10 4.8h4l1.4 2.4"/><circle cx="12" cy="13.2" r="3.3"/>',
+  chat: '<path d="M4 7.2a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3H9.2L4.8 19.6c-.5.4-.8.2-.8-.4z"/><path d="M8.5 10.2h.01M12 10.2h.01M15.5 10.2h.01"/>',
+  briefcase: '<rect x="3.6" y="7.6" width="16.8" height="12" rx="3"/><path d="M9 7.6V6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v1.6M3.6 12.4h16.8"/>',
+  star: '<path d="M12 4.2l2.3 4.9 5.2.6-3.9 3.6 1.1 5.3L12 16l-4.7 2.6 1.1-5.3-3.9-3.6 5.2-.6z"/>',
+  target: '<circle cx="12" cy="12" r="8.4"/><circle cx="12" cy="12" r="4.6"/><path d="M12 12h.01"/>',
 };
+
+export const hasIcon = (name) => typeof name === 'string' && name in P;
 
 export function svgStr(name, size = 18) {
   return `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[name] || ''}</svg>`;

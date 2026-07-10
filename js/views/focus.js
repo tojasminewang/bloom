@@ -60,7 +60,7 @@ export function completeTimer() {
     };
     sfx.start();
     notifyBG(`Round ${round} — back to ${name}`, 'Break’s over. You’ve got this.');
-    toast(`Round ${round} — back to ${name}`, '🌱');
+    toast(`Round ${round} — back to ${name}`, 'sprout');
     store.save();
     return;
   }
@@ -74,7 +74,7 @@ export function completeTimer() {
       mode: 'cycle', phase: 'break', round: t.round || 1,
       startedAt: Date.now(), pausedAt: null, pausedTotal: 0,
     };
-    notifyBG('Session complete', `+${minutes}m to ${name} — ${Math.round(t.breakSec / 60)} minute break now 🍃`);
+    notifyBG('Session complete', `+${minutes}m to ${name} — ${Math.round(t.breakSec / 60)} minute break now`);
   } else {
     store.state.timer = null;
     document.title = 'Bloom';
@@ -125,13 +125,13 @@ async function endEarly({ discardable } = {}) {
     store.state.timer = null;
     document.title = 'Bloom';
     store.save();
-    toast('Cycle ended — well grown', '🌿');
+    toast('Cycle ended — well grown', 'leaf');
     return;
   }
   const elapsedMin = Math.floor(timerElapsedSec() / 60);
   if (discardable) {
     const msg = elapsedMin >= 1
-      ? `End this session early? Your ${fmtMin(elapsedMin)} still gets logged — no minute wasted 💚`
+      ? `End this session early? Your ${fmtMin(elapsedMin)} still gets logged — no minute wasted.`
       : 'End this session? Nothing to log yet (under a minute).';
     if (!(await confirmDialog(msg, { yes: 'End session', no: 'Keep going' }))) return;
   }
@@ -141,6 +141,7 @@ async function endEarly({ discardable } = {}) {
   if (elapsedMin >= 1) { sfx.chime(); logSession({ skillId, minutes: elapsedMin, source: 'timer' }); }
   else store.save();
 }
+
 
 // ---------- zen fullscreen ----------
 let zenEl = null;
@@ -156,8 +157,8 @@ function zenEsc(e) { if (e.key === 'Escape') closeZen(); }
 
 function openZen() {
   const t = store.state.timer;
-  if (!t) { toast('Start a focus session first', '⏳'); return; }
-  const sk = skillById(t.skillId) || { name: 'focus', color: '#8FA35E', id: 'zen' };
+  if (!t) { toast('Start a focus session first', 'hourglass'); return; }
+  const sk = skillById(t.skillId) || { name: 'focus', icon: 'sprout', color: '#8FA35E', id: 'zen' };
 
   const R = 168, C = 2 * Math.PI * R;
   const svgWrap = el('div', { class: 'zen-ring-wrap' });
@@ -168,6 +169,18 @@ function openZen() {
   const prog = svgWrap.querySelector('.prog');
 
   const plantWrap = el('div', { class: 'zen-plant' });
+  // crop the empty sky above the drawn plant so the plant+time+label group truly centers
+  const fitPlant = () => {
+    const svg = plantWrap.querySelector('svg');
+    if (!svg) return;
+    let top = Infinity;
+    for (const k of svg.children) {
+      try { const b = k.getBBox(); if (b.width || b.height) top = Math.min(top, b.y); } catch { /* not measurable */ }
+    }
+    if (!isFinite(top)) top = 0;
+    const scaleF = (svg.getBoundingClientRect().height || 144) / 150;
+    plantWrap.style.marginTop = `${(-(Math.max(0, top - 4)) * scaleF).toFixed(1)}px`;
+  };
   const timeEl = el('div', { class: 'zen-time' }, fmtClock(timerRemaining()));
   const labelEl = el('div', { class: 'zen-label' });
   const pauseBtn = el('button', { class: 'btn', onClick: () => { togglePause(); } }, ic('pause', { size: 13 }), 'Pause');
@@ -187,6 +200,7 @@ function openZen() {
   zenLevel = 0;
 
   const tick = () => {
+    checkTimer(); // self-drive completion so zen doesn't stall if the tab is throttled
     const tt = store.state.timer;
     if (!tt) { closeZen(); return; }
     const phase = tt.phase || 'work';
@@ -207,10 +221,11 @@ function openZen() {
       const grew = live > zenLevel && zenLevel !== 0;
       zenLevel = live;
       plantWrap.innerHTML = plantSVG(sk, live, 118);
+      fitPlant();
       if (grew) { sfx.level(); burst(innerWidth / 2, innerHeight / 2, { count: 20 }); }
     }
     const scale = 0.92 + progress * 0.1;
-    plantWrap.style.transform = `scale(${scale.toFixed(3)})`;
+    plantWrap.style.setProperty('--zs', scale.toFixed(3)); // CSS owns the centering transform
   };
   tick();
   zenInterval = setInterval(tick, 500);
@@ -226,13 +241,129 @@ function closeZen() {
   if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
 }
 
+// ---------- pop-out timer (Document Picture-in-Picture) ----------
+// A tiny always-on-top window that keeps the countdown visible while you're in other apps.
+let pipWin = null;
+let pipInterval = null;
+let pipOpening = false; // synchronous in-flight guard across the async requestWindow gap
+let pipOnHide = null;
+
+export function pipSupported() { return 'documentPictureInPicture' in window; }
+
+const PIP_CSS = `
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; }
+  body { font-family: 'Quicksand', system-ui, sans-serif; background: #F4F0E2; color: #4A5238;
+    display: flex; flex-direction: column; overflow: hidden; }
+  .pip-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px; padding: 8px 12px; text-align: center; }
+  .pip-main { display: flex; align-items: center; gap: 11px; }
+  .pip-plant { width: 62px; height: 78px; flex-shrink: 0; display: flex; align-items: flex-end; justify-content: center; }
+  .pip-plant svg { width: 62px; height: 78px; display: block; }
+  .pip-info { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
+  .pip-time { font-family: 'Fraunces', Georgia, serif; font-size: 40px; font-weight: 600; line-height: 1; color: #3A422C; font-variant-numeric: tabular-nums; }
+  .pip-label { font-size: 11.5px; font-weight: 600; color: #8F937D; }
+  .pip-btn { font-family: inherit; font-size: 12px; font-weight: 700; border: 1.5px solid rgba(96,108,62,0.32);
+    background: transparent; color: #4A5238; border-radius: 999px; padding: 5px 18px; cursor: pointer; margin-top: 2px; }
+  .pip-btn:hover { background: rgba(124,139,79,0.14); }
+  .pip-bar { height: 5px; width: 100%; background: rgba(96,108,62,0.16); }
+  .pip-bar-fill { height: 100%; width: 0%; background: #7C8B4F; transition: width 0.25s linear; }
+  body.pip-dark { background: #14180E; color: #EAEEDB; }
+  body.pip-dark .pip-time { color: #FAFBF1; }
+  body.pip-dark .pip-label { color: #A9B18F; }
+  body.pip-dark .pip-btn { color: #EAEEDB; border-color: rgba(234,238,219,0.32); }
+  body.pip-dark .pip-bar { background: rgba(234,238,219,0.14); }
+`;
+
+export async function openPip() {
+  if (!store.state.timer) { toast('Start a focus session first', 'hourglass'); return; }
+  if (!pipSupported()) { toast('Pop-out works in Chrome or Edge', 'hourglass'); return; }
+  if (pipWin || pipOpening) { pipWin?.focus(); return; } // covers the async gap so two fast clicks can't double-open
+  pipOpening = true;
+  let win;
+  try {
+    win = await documentPictureInPicture.requestWindow({ width: 272, height: 194 });
+  } catch {
+    toast('Could not open the pop-out', 'hourglass');
+    return;
+  } finally {
+    pipOpening = false;
+  }
+  pipWin = win;
+
+  const doc = win.document;
+  // carry over Bloom's fonts (a PiP document starts with no styles of its own)
+  for (const link of document.querySelectorAll('link[rel="stylesheet"], link[rel="preconnect"]')) {
+    if (/fonts\./.test(link.href)) doc.head.append(link.cloneNode(true));
+  }
+  const style = doc.createElement('style');
+  style.textContent = PIP_CSS;
+  doc.head.append(style);
+
+  const plantWrap = el('div', { class: 'pip-plant' });
+  const timeEl = el('div', { class: 'pip-time' }, fmtClock(timerRemaining()));
+  const labelEl = el('div', { class: 'pip-label' });
+  const pauseBtn = el('button', { class: 'pip-btn', onClick: () => togglePause() }, 'Pause');
+  const barFill = el('div', { class: 'pip-bar-fill' });
+  doc.body.append(
+    el('div', { class: 'pip-wrap' },
+      el('div', { class: 'pip-main' }, plantWrap, el('div', { class: 'pip-info' }, timeEl, labelEl)),
+      pauseBtn,
+    ),
+    el('div', { class: 'pip-bar' }, barFill),
+  );
+
+  let lastPhase = null, pipLevel = 0;
+  const tick = () => {
+    checkTimer(); // self-drive completion — the main-tab loop is throttled while you're in another app
+    const tt = store.state.timer;
+    if (!tt) { closePip(); return; } // single session finished → close the pop-out
+    const phase = tt.phase || 'work';
+    const rem = timerRemaining();
+    const progress = tt.durationSec > 0 ? 1 - rem / tt.durationSec : 1;
+    const sk = skillById(tt.skillId);
+    doc.body.classList.toggle('pip-dark', (document.documentElement.dataset.theme || 'light') === 'dark'); // follow live theme
+    // the plant grows live: elapsed work minutes count as XP toward the next level
+    if (sk) {
+      const bonus = phase === 'work' ? Math.floor(timerElapsedSec() / 60) : 0;
+      const live = levelForXp(xpOf(sk.id) + bonus).level;
+      if (live !== pipLevel) { pipLevel = live; plantWrap.innerHTML = plantSVG(sk, live, 62); }
+    }
+    timeEl.textContent = fmtClock(rem);
+    labelEl.textContent = phase === 'break'
+      ? `break · round ${tt.round || 1}`
+      : (tt.mode === 'cycle' ? `${sk ? sk.name : 'focus'} · round ${tt.round || 1}` : (sk ? sk.name : 'focus'));
+    if (phase !== lastPhase) barFill.style.transition = 'none'; // don't slide the bar backwards on a phase change
+    barFill.style.width = `${Math.round(progress * 100)}%`;
+    barFill.style.background = phase === 'break' ? '#7FA98F' : (sk ? sk.color : '#7C8B4F');
+    if (phase !== lastPhase) { void barFill.offsetWidth; barFill.style.transition = ''; lastPhase = phase; }
+    pauseBtn.textContent = tt.pausedAt ? 'Resume' : 'Pause';
+  };
+  tick();
+  pipInterval = setInterval(tick, 250);
+  // user closed the pop-out window themselves — identity-guarded so a stale close can't clobber a reopened window
+  pipOnHide = () => { if (pipWin !== win) return; clearInterval(pipInterval); pipInterval = null; pipWin = null; };
+  win.addEventListener('pagehide', pipOnHide);
+}
+
+function closePip() {
+  clearInterval(pipInterval);
+  pipInterval = null;
+  const w = pipWin;
+  pipWin = null;
+  if (w) {
+    if (pipOnHide) { try { w.removeEventListener('pagehide', pipOnHide); } catch { /* gone */ } }
+    try { w.close(); } catch { /* already gone */ }
+  }
+  pipOnHide = null;
+}
+
 // ---------- view ----------
 const RING_R = 100;
 const RING_C = 2 * Math.PI * RING_R;
 
 function runningCard() {
   const t = store.state.timer;
-  const sk = skillById(t.skillId) || { name: '?', emoji: '', color: '#8FA35E', id: 'x' };
+  const sk = skillById(t.skillId) || { name: '?', icon: 'sprout', color: '#8FA35E', id: 'x' };
   const phase = t.phase || 'work';
   const onBreak = phase === 'break';
 
@@ -280,7 +411,7 @@ function runningCard() {
     heading,
     el('p', { class: 'muted small', style: { marginTop: '4px' } }, subText),
     el('div', { class: 'timer-ring-wrap' }, svg,
-      el('div', { class: 'timer-center' }, timeEl, el('div', { class: 'timer-skill' }, onBreak ? 'breathe' : `${sk.emoji} ${sk.name}`)),
+      el('div', { class: 'timer-center' }, timeEl, el('div', { class: 'timer-skill' }, onBreak ? 'breathe' : sk.name)),
     ),
     el('div', { class: 'row gap', style: { justifyContent: 'center', flexWrap: 'wrap' } },
       el('button', { class: 'btn', id: 'timer-pause-btn', onClick: togglePause },
@@ -289,6 +420,9 @@ function runningCard() {
         ? el('button', { class: 'btn btn-green', id: 'timer-skip-btn', onClick: skipBreak }, ic('play', { size: 13 }), 'Skip break')
         : el('button', { class: 'btn btn-green', id: 'timer-finish-btn', onClick: () => endEarly({ discardable: false }) }, ic('check', { size: 13 }), 'Finish & log'),
       el('button', { class: 'btn', id: 'timer-zen-btn', title: 'Zen fullscreen (z)', onClick: toggleZen }, ic('expand', { size: 13 }), 'Zen'),
+      pipSupported()
+        ? el('button', { class: 'btn', id: 'timer-pip-btn', title: 'Pop out a floating timer — stays on top while you work in other apps', onClick: openPip }, ic('pip', { size: 13 }), 'Pop out')
+        : null,
       el('button', { class: 'btn btn-danger', id: 'timer-end-btn', onClick: () => endEarly({ discardable: true }) }, onBreak ? 'End cycle' : 'End'),
     ),
   );
@@ -304,7 +438,7 @@ function setupCard() {
     style: sk.id === selSkillId ? { background: sk.color } : {},
     dataset: { skill: sk.name },
     onClick: () => { selSkillId = sk.id; sfx.click(); store.notify(); },
-  }, `${sk.emoji} ${sk.name}`));
+  }, ic((sk.icon || 'sprout'), { size: 12 }), ` ${sk.name}`));
   chips.push(el('button', {
     class: 'skill-chip', onClick: async () => {
       const sk = await openSkillEditor();
@@ -324,11 +458,18 @@ function setupCard() {
   }, `${d}m`));
 
   // single session vs pomodoro cycles
-  const breakChips = [5, 10].map((b) => el('button', {
+  const BREAKS = [5, 10];
+  const syncBreak = () => breakChips.forEach((c) => c.classList.toggle('sel', parseInt(c.dataset.brk, 10) === selBreak));
+  const breakChips = BREAKS.map((b) => el('button', {
     class: 'dur-chip' + (b === selBreak ? ' sel' : ''), dataset: { brk: b },
-    onClick: () => { selBreak = b; sfx.click(); breakChips.forEach((c) => c.classList.toggle('sel', parseInt(c.dataset.brk, 10) === selBreak)); },
+    onClick: () => { selBreak = b; breakCustom.value = ''; sfx.click(); syncBreak(); },
   }, `${b}m break`));
-  const breakRow = el('div', { class: 'dur-chips', style: { display: selMode === 'cycle' ? '' : 'none', margin: '4px 0 0' } }, ...breakChips);
+  const breakCustom = el('input', {
+    class: 'input dur-custom', type: 'number', min: '1', max: '60', 'aria-label': 'custom break minutes',
+    placeholder: '…', value: BREAKS.includes(selBreak) ? '' : selBreak,
+    onInput: (e) => { const v = parseInt(e.target.value, 10); if (v > 0) { selBreak = Math.min(v, 60); syncBreak(); } },
+  });
+  const breakRow = el('div', { class: 'dur-chips', style: { display: selMode === 'cycle' ? '' : 'none', margin: '4px 0 0' } }, ...breakChips, breakCustom);
   const modeChips = [['single', 'Single session'], ['cycle', 'Cycles']].map(([m, label]) => el('button', {
     class: 'dur-chip' + (selMode === m ? ' sel' : ''), dataset: { mode: m },
     onClick: () => {
@@ -348,7 +489,7 @@ function setupCard() {
   const startBtn = el('button', {
     class: 'btn btn-primary btn-big', id: 'timer-start-btn',
     onClick: () => {
-      if (!selSkillId) { sfx.uhoh(); toast('Pick a plant to water first 🌱', '🪴'); return; }
+      if (!selSkillId) { sfx.uhoh(); toast('Pick a plant to water first', 'pot'); return; }
       startTimer(selSkillId, selDur);
     },
   }, selMode === 'cycle' ? `Start ${selDur}m rounds` : `Start ${selDur}m of focus`);
@@ -369,26 +510,10 @@ function setupCard() {
 }
 
 function manualCard() {
-  const minutesIn = el('input', { class: 'input', type: 'number', min: '1', max: '1440', placeholder: 'min', id: 'manual-min-in', style: { width: '90px' } });
-  const dateIn = el('input', { class: 'input', type: 'date', value: todayYmd(), id: 'manual-date-in' });
-  let skillId = selSkillId || '';
-  const sel = skillSelect({ value: skillId, allowNone: false, noneLabel: 'pick a plant', id: 'manual-skill-in', onChange: (id) => { skillId = id; } });
-  if (!store.state.skills.length) sel.value = '';
-
-  function submit() {
-    const min = parseInt(minutesIn.value, 10);
-    if (!skillId || !skillById(skillId)) { sfx.uhoh(); toast('Pick a plant first 🌱', '🪴'); return; }
-    if (!min || min < 1) { minutesIn.focus(); return; }
-    logSession({ skillId, minutes: min, date: dateIn.value || todayYmd(), source: 'manual' });
-  }
-
   return el('div', { class: 'card' },
-    el('div', { class: 'card-title' }, el('h2', {}, 'Log time ', el('em', {}, 'yourself')), ic('pencil', { size: 15, cls: 'title-ic' })),
+    el('div', { class: 'card-title' }, el('h2', {}, 'Add ', el('em', {}, 'time')), ic('pencil', { size: 15, cls: 'title-ic' })),
     quickLogBox(),
-    el('div', { class: 'row gap wrap', style: { marginTop: '14px', paddingTop: '14px', borderTop: '1.5px dashed var(--line-strong)' } },
-      sel, minutesIn, dateIn,
-      el('button', { class: 'btn', id: 'manual-add-btn', onClick: submit }, 'Add'),
-    ),
+    el('p', { class: 'muted small', style: { marginTop: '10px' } }, 'Works for the past too — “30m piano yesterday” or “1h math 2026-07-01”.'),
   );
 }
 
@@ -402,7 +527,7 @@ function historyCard() {
       ? el('div', {}, ...sessions.map((sess) => {
           const sk = skillById(sess.skillId);
           return el('div', { class: 'session-row' },
-            el('span', {}, sk ? `${sk.emoji} ${sk.name}` : '(removed)'),
+            sk ? el('span', { class: 'row', style: { gap: '6px' } }, ic((sk.icon || 'sprout'), { size: 13 }), sk.name) : el('span', {}, '(removed)'),
             el('span', { class: 'chip green' }, fmtMin(sess.minutes)),
             el('span', { class: 'muted small session-meta' }, `${fmtDateShort(sess.date)} · `, ic(sess.source === 'timer' ? 'hourglass' : 'pencil', { size: 11 }), sess.source === 'timer' ? ' timer' : ' logged'),
             el('span', { class: 'spacer' }),
@@ -417,7 +542,7 @@ function historyCard() {
             }, ic('trash', { size: 14 })),
           );
         }))
-      : el('div', { class: 'empty' }, el('span', { class: 'big' }, ic('hourglass', { size: 26 })), 'No sessions yet — start the timer or quick-log above.'),
+      : el('div', { class: 'empty' }, el('span', { class: 'big' }, ic('hourglass', { size: 26 })), 'No sessions yet — start the timer or add time above.'),
   );
 }
 

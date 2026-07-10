@@ -4,11 +4,10 @@ import { store } from '../store.js';
 import { openModal, confirmDialog, toast } from '../ui.js';
 import { sfx } from '../audio.js';
 import { plantSVG } from '../plant.js';
-import { xpOf, levelOf, minutesTotal, weekMinutes, minutesOn, lastNDays, streak, skillById, gardenTier, stageName } from '../progress.js';
-import { gardenBannerSVG } from '../banner.js';
-import { barChartSVG, dayLabels7, heatmapSVG, heatmapLegend } from '../charts.js';
+import { xpOf, levelOf, minutesTotal, weekMinutes, lastNDays, streak, skillById, gardenTier, stageName, KEEPSAKES } from '../progress.js';
+import { gardenBannerSVG, gardenSceneSVG } from '../banner.js';
+import { barChartSVG, dayLabels7 } from '../charts.js';
 import { openSkillEditor } from '../skillEditor.js';
-import { quickLogBox } from '../quicklog.js';
 import { setFocusSkill } from './focus.js';
 import { taskRow } from './tasks.js';
 import { selectNote } from './notes.js';
@@ -26,7 +25,7 @@ function openSkillDetails(sk) {
   const content = el('div', {},
     el('div', { style: { textAlign: 'center' } },
       el('div', { html: plantSVG(sk, lv.level, 120) }),
-      el('h2', {}, `${sk.emoji} ${sk.name}`),
+      el('h2', { class: 'row', style: { justifyContent: 'center', gap: '8px' } }, ic((sk.icon || 'sprout'), { size: 17, cls: 'title-ic' }), sk.name),
       el('div', { class: 'row gap', style: { justifyContent: 'center', marginTop: '8px' } },
         el('span', { class: 'chip lilac' }, `lv ${lv.level} · ${stageName(lv.level)}`),
         el('span', { class: 'chip green' }, `${xpOf(sk.id)} XP`),
@@ -78,7 +77,7 @@ function openSkillDetails(sk) {
           for (const n of store.state.notes) if (n.skillId === sk.id) n.skillId = null;
           store.save();
           close();
-          toast(`${sk.name} uprooted`, '🥀');
+          toast(`${sk.name} uprooted`, 'x-circle');
         },
       }, 'Uproot'),
       el('button', { class: 'btn', onClick: async () => { close(); await openSkillEditor(sk); } }, ic('pencil', { size: 13 }), 'Edit'),
@@ -96,7 +95,7 @@ function plantCard(sk) {
   return el('div', { class: 'card plant-card', dataset: { skill: sk.name } },
     el('span', { class: 'chip lilac lvl-badge' }, `lv ${lv.level} · ${stageName(lv.level)}`),
     el('div', { class: 'plant-wrap', html: plantSVG(sk, lv.level, 104), onClick: () => openSkillDetails(sk), style: { cursor: 'pointer' } }),
-    el('div', { class: 'plant-name' }, `${sk.emoji} ${sk.name}`),
+    el('div', { class: 'plant-name' }, ic((sk.icon || 'sprout'), { size: 14, cls: 'title-ic' }), sk.name),
     el('div', { class: 'xp-bar', title: `${lv.into}/${lv.need} XP to next level` },
       el('div', { class: 'xp-fill', style: { width: `${Math.max(3, Math.round((lv.into / lv.need) * 100))}%` } })),
     el('div', { class: 'plant-stats' }, `${fmtMin(minutesTotal(sk.id))} total · ${fmtMin(week)} this week`),
@@ -115,10 +114,20 @@ export function render(root) {
   const total = minutesTotal();
   const tier = gardenTier();
 
-  // ---- hills banner: a tree for every plant, a flower for recent sessions ----
+  // ---- the garden itself: your real plants in the meadow (hills only while empty) ----
   const grown = total > 0;
-  const banner = el('div', { class: 'garden-banner' },
-    el('div', { html: gardenBannerSVG({ seed: 'bloom-hills-' + s.skills.length, trees: Math.min(8 + s.skills.length * 2, 16), flowers: Math.min(s.sessions.length, 8) }) }),
+  const scene = skills.length
+    ? gardenSceneSVG(skills.map((sk) => ({ sk, level: levelOf(sk.id).level })))
+    : gardenBannerSVG({ seed: 'bloom-hills-0', trees: 10, flowers: 4 });
+  const banner = el('div', {
+    class: 'garden-banner' + (skills.length ? ' scene' : ''),
+    onClick: (e) => {
+      const g = e.target.closest('.scene-plant');
+      const sk = g && skillById(g.dataset.skillId);
+      if (sk) { sfx.click(); openSkillDetails(sk); }
+    },
+  },
+    el('div', { html: scene }),
     el('div', { class: 'banner-overlay' },
       el('div', { class: 'banner-line1' }, grown ? `You've grown ${fmtMin(total)}`.toUpperCase() : 'YOUR GARDEN AWAITS'),
       el('div', { class: 'banner-line2' }, grown
@@ -162,24 +171,6 @@ export function render(root) {
     ),
     banner,
     tierStrip,
-    el('div', { class: 'card', style: { marginTop: '20px' } },
-      el('div', { class: 'garden-top' },
-        el('div', { class: 'gt-left' },
-          el('div', { class: 'card-title', style: { marginBottom: '10px' } }, el('h2', {}, 'Quick ', el('em', {}, 'log')), ic('bolt', { size: 15, cls: 'title-ic' })),
-          quickLogBox(),
-          el('div', { class: 'row gap wrap', style: { marginTop: '14px' } },
-            el('span', { class: 'chip green' }, ic('stopwatch', { size: 11 }), ` ${fmtMin(weekMinutes())} this week`),
-            el('span', { class: 'chip sun' }, ic('flame', { size: 11 }), ` ${st} day streak`),
-          ),
-        ),
-        el('div', { class: 'gt-right' },
-          el('div', { class: 'card-title', style: { marginBottom: '10px' } }, el('h2', {}, 'Consistency'), ic('calendar', { size: 15, cls: 'title-ic' }),
-            el('span', { class: 'spacer' }), el('span', { html: heatmapLegend() })),
-          el('div', { html: heatmapSVG((d) => minutesOn(d)) }),
-          el('p', { class: 'muted small', style: { marginTop: '8px' } }, `Last 14 weeks · today ${fmtMin(minutesOn(todayYmd()))}`),
-        ),
-      ),
-    ),
     skills.length
       ? el('div', { class: 'garden-grid' },
           ...skills.map(plantCard),
@@ -188,8 +179,30 @@ export function render(root) {
         )
       : el('div', { class: 'card', style: { marginTop: '16px' } },
           el('div', { class: 'empty', style: { border: 'none' } },
-            el('span', { class: 'big' }, '🌵'),
+            el('span', { class: 'big' }, ic('pot', { size: 26 })),
             'Your garden is empty! Type something like “30m math” above, or plant a skill.',
           )),
+    keepsakeShelf(),
+  );
+}
+
+function keepsakeShelf() {
+  const s = store.state;
+  const earned = KEEPSAKES.filter((k) => k.test(s)).length;
+  return el('div', { class: 'card', style: { marginTop: '16px' } },
+    el('div', { class: 'card-title' },
+      el('h2', {}, 'Keepsake ', el('em', {}, 'shelf')),
+      ic('star', { size: 15, cls: 'title-ic' }),
+      el('span', { class: 'spacer' }),
+      el('span', { class: 'chip lilac' }, `${earned} of ${KEEPSAKES.length}`),
+    ),
+    el('div', { class: 'shelf-grid' }, ...KEEPSAKES.map((k) => {
+      const got = k.test(s);
+      return el('div', { class: 'keepsake' + (got ? ' got' : ''), title: got ? k.name : `To earn: ${k.how}` },
+        el('div', { class: 'keepsake-ic' }, ic(k.icon, { size: 18 })),
+        el('div', { class: 'keepsake-name' }, k.name),
+        el('div', { class: 'muted small' }, got ? 'earned' : k.how),
+      );
+    })),
   );
 }

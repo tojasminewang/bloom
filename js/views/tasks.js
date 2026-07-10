@@ -1,5 +1,5 @@
 // views/tasks.js — to-do list. Completing a linked task feeds its plant (+10 XP).
-import { el, relDue, todayYmd, dayDiff, fmtDate, nextOccurrence } from '../util.js';
+import { el, relDue, todayYmd, ymd, dayDiff, fmtDate, nextOccurrence } from '../util.js';
 import { store, uid } from '../store.js';
 import { toast, confirmDialog } from '../ui.js';
 import { sfx } from '../audio.js';
@@ -24,7 +24,7 @@ export function toggleTask(t, ev) {
     sfx.pop();
     burst(ev?.clientX || innerWidth / 2, ev?.clientY || 200, { count: 16 });
     if (t.skillId && before != null && celebrateIfLeveled(t.skillId, before)) return;
-    toast(`Done — comes back ${relDue(t.due)}`, '🌱');
+    toast(`Done — comes back ${relDue(t.due)}`, 'repeat');
     return;
   }
 
@@ -36,7 +36,7 @@ export function toggleTask(t, ev) {
     burst(ev?.clientX || innerWidth / 2, ev?.clientY || 200, { count: 16 });
     if (t.skillId && before != null && !celebrateIfLeveled(t.skillId, before)) {
       const sk = skillById(t.skillId);
-      if (sk) toast(`+10 XP → ${sk.name}`, sk.emoji);
+      if (sk) toast(`+10 XP → ${sk.name}`, (sk.icon || 'sprout'));
     }
   }
 }
@@ -70,7 +70,7 @@ export function taskRow(t, { showDue = true } = {}) {
     chips.push(el('span', { class: 'chip ' + (diff < 0 ? 'overdue' : diff === 0 ? 'due-today' : '') }, ic('calendar', { size: 11 }), relDue(t.due)));
   }
   if (t.repeat) chips.push(el('span', { class: 'chip lilac' }, ic('repeat', { size: 10 }), t.repeat));
-  if (sk) chips.push(el('span', { class: 'chip', style: { background: sk.color + '30' } }, `${sk.emoji} ${sk.name}`));
+  if (sk) chips.push(el('span', { class: 'chip', style: { background: sk.color + '30' } }, ic((sk.icon || 'sprout'), { size: 10 }), ` ${sk.name}`));
   if (t.priority === 2 && !t.done) chips.push(el('span', { class: 'chip coral' }, '‼ high'));
   if (t.priority === 1 && !t.done) chips.push(el('span', { class: 'chip sun' }, '! medium'));
 
@@ -99,29 +99,29 @@ function addForm() {
   });
   const dueIn = el('input', { class: 'input', type: 'date', id: 'task-due-in', value: draft.due, onInput: (e) => { draft.due = e.target.value; } });
   const skillSel = skillSelect({
-    value: draft.skillId, allowNone: true, noneLabel: 'no plant', id: 'task-skill-in',
+    value: draft.skillId, allowNone: true, noneLabel: 'grow a plant?', id: 'task-skill-in',
     onChange: (id) => { draft.skillId = id || ''; },
   });
   skillSel.style.width = 'auto';
-  const prioLabels = ['⚑ none', '! medium', '‼ high'];
+  const prioLabels = ['priority', '! medium', '‼ high'];
   const prioBtn = el('button', {
-    class: 'btn', id: 'task-prio-in', type: 'button',
+    class: 'btn', id: 'task-prio-in', type: 'button', title: 'How urgent is it?',
     onClick: () => { draft.priority = (draft.priority + 1) % 3; prioBtn.textContent = prioLabels[draft.priority]; sfx.click(); },
   }, prioLabels[draft.priority]);
   const repeatSel = el('select', { class: 'input', id: 'task-repeat-in', style: { width: 'auto' }, onChange: (e) => { draft.repeat = e.target.value; } },
-    el('option', { value: '' }, 'no repeat'),
-    el('option', { value: 'daily' }, 'daily'),
-    el('option', { value: 'weekly' }, 'weekly'),
-    el('option', { value: 'monthly' }, 'monthly'),
+    el('option', { value: '' }, 'repeat?'),
+    el('option', { value: 'daily' }, 'repeats daily'),
+    el('option', { value: 'weekly' }, 'repeats weekly'),
+    el('option', { value: 'monthly' }, 'repeats monthly'),
   );
   repeatSel.value = draft.repeat || '';
 
   function submit() {
     const title = titleIn.value.trim();
     if (!title) { titleIn.focus(); return; }
+    const due = draft.due || (draft.repeat ? todayYmd() : null); // repeating tasks need a first date
     store.state.tasks.push({
-      id: uid(), title, done: false, doneAt: null,
-      due: draft.due || (draft.repeat ? todayYmd() : null), // repeating tasks need a first date
+      id: uid(), title, done: false, doneAt: null, due,
       skillId: draft.skillId || null, priority: draft.priority,
       repeat: draft.repeat || null, completions: 0,
       createdAt: new Date().toISOString(),
@@ -129,6 +129,7 @@ function addForm() {
     Object.assign(draft, { title: '', due: '', skillId: '', priority: 0, repeat: '' });
     sfx.click();
     store.save();
+    if (due && due !== todayYmd()) toast(`Waiting on ${fmtDate(due)} — see it in the calendar`, 'calendar');
   }
 
   return el('div', { class: 'add-task-form' },
@@ -141,19 +142,14 @@ export function render(root) {
   const s = store.state;
   const today = todayYmd();
   let open = s.tasks.filter((t) => !t.done);
-  const doneTasks = s.tasks.filter((t) => t.done).sort((a, b) => (b.doneAt || '').localeCompare(a.doneAt || ''));
+  // done: only what was finished today (older completions stay on their calendar day)
+  const doneTasks = s.tasks.filter((t) => t.done && t.doneAt && ymd(new Date(t.doneAt)) === today)
+    .sort((a, b) => (b.doneAt || '').localeCompare(a.doneAt || ''));
   if (filterSkill !== 'all') open = open.filter((t) => t.skillId === filterSkill);
 
-  const overdue = open.filter((t) => t.due && t.due < today).sort(bySort);
+  // only today's tasks live here — anything dated for another day shows on that day in the calendar
   const dueToday = open.filter((t) => t.due === today).sort(bySort);
-  const upcoming = open.filter((t) => t.due && t.due > today).sort(bySort);
   const someday = open.filter((t) => !t.due).sort(bySort);
-
-  const upcomingByDate = new Map();
-  for (const t of upcoming) {
-    if (!upcomingByDate.has(t.due)) upcomingByDate.set(t.due, []);
-    upcomingByDate.get(t.due).push(t);
-  }
 
   const filterRow = s.skills.length
     ? el('div', { class: 'row gap wrap', style: { margin: '14px 0 2px' } },
@@ -161,7 +157,7 @@ export function render(root) {
         ...s.skills.map((sk) => el('button', {
           class: 'chip chip-btn' + (filterSkill === sk.id ? ' sel' : ''),
           onClick: () => { filterSkill = filterSkill === sk.id ? 'all' : sk.id; store.notify(); },
-        }, `${sk.emoji} ${sk.name}`)),
+        }, ic((sk.icon || 'sprout'), { size: 11 }), ` ${sk.name}`)),
       )
     : null;
 
@@ -169,11 +165,9 @@ export function render(root) {
   const section = (label, chipClass, tasks) => {
     if (!tasks.length) return;
     sections.push(el('div', { class: 'group-label' }, el('span', { class: 'chip ' + chipClass }, label), `${tasks.length}`));
-    sections.push(...tasks.map((t) => taskRow(t)));
+    sections.push(...tasks.map((t) => taskRow(t, { showDue: false }))); // day heading already says the date
   };
-  section('Overdue', 'overdue', overdue);
   section('Today', 'due-today', dueToday);
-  for (const [date, ts] of upcomingByDate) section('📅 ' + relDue(date), 'lilac', ts);
   section('Someday', '', someday);
 
   if (!sections.length) {
@@ -190,7 +184,8 @@ export function render(root) {
             class: 'link-btn', onClick: async (e) => {
               e.preventDefault(); e.stopPropagation();
               if (await confirmDialog(`Clear ${doneTasks.length} completed ${doneTasks.length === 1 ? 'task' : 'tasks'}? Their XP stays in your garden.`, { yes: 'Clear' })) {
-                store.state.tasks = store.state.tasks.filter((t) => !t.done);
+                const ids = new Set(doneTasks.map((t) => t.id));
+                store.state.tasks = store.state.tasks.filter((t) => !ids.has(t.id));
                 store.save();
               }
             },
