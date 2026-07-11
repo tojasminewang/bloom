@@ -75,7 +75,7 @@ function noiseSource(c, color = 'white') {
   return src;
 }
 
-// ---- background music: a soft generative garden loop, on by default ----
+// ---- background music: a soft generative lofi study loop, on by default ----
 let musicNodes = null;
 let musicTimer = null;
 
@@ -91,76 +91,123 @@ export function startMusic() {
     master.gain.exponentialRampToValueAtTime(1, c.currentTime + 3);
     master.connect(c.destination);
 
-    // faint warm air under everything
+    // dusty vinyl bed under everything
     const air = noiseSource(c, 'brown');
     const airF = c.createBiquadFilter();
     airF.type = 'lowpass';
-    airF.frequency.value = 260;
+    airF.frequency.value = 240;
     const airG = c.createGain();
-    airG.gain.value = 0.008;
+    airG.gain.value = 0.006;
     air.connect(airF).connect(airG).connect(master);
     air.start();
 
     musicNodes = [master, air, airF, airG];
 
-    const padNote = (f, t, dur) => {
-      const o = c.createOscillator();
-      o.type = 'sine';
-      o.frequency.value = f;
+    // one shared noise buffer; every hat/snare/crackle is a cheap slice of it
+    const noiseBuf = (() => {
+      const len = c.sampleRate | 0;
+      const buf = c.createBuffer(1, len, c.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+      return buf;
+    })();
+    const noiseHit = (t, { dur = 0.05, vol = 0.02, type = 'highpass', freq = 6000, q = 1 } = {}) => {
+      const s = c.createBufferSource();
+      s.buffer = noiseBuf;
+      const f = c.createBiquadFilter();
+      f.type = type; f.frequency.value = freq; f.Q.value = q;
       const g = c.createGain();
-      g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(0.016, t + 0.9);
+      g.gain.setValueAtTime(vol, t);
       g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-      o.connect(g).connect(master);
-      o.start(t);
-      o.stop(t + dur + 0.1);
-    };
-    const bassNote = (f, t, dur) => {
-      const o = c.createOscillator();
-      o.type = 'sine';
-      o.frequency.value = f;
-      const g = c.createGain();
-      g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(0.02, t + 0.3);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-      o.connect(g).connect(master);
-      o.start(t);
-      o.stop(t + dur + 0.1);
-    };
-    const pluck = (f, t) => {
-      const o = c.createOscillator();
-      o.type = 'triangle';
-      o.frequency.value = f;
-      const filt = c.createBiquadFilter();
-      filt.type = 'lowpass';
-      filt.frequency.value = 2200;
-      const g = c.createGain();
-      g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(0.026, t + 0.02);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + 1.5);
-      o.connect(filt).connect(g).connect(master);
-      o.start(t);
-      o.stop(t + 1.6);
+      s.connect(f).connect(g).connect(master);
+      s.start(t, Math.random() * 0.5, dur + 0.05);
     };
 
-    // Fmaj7 → Em7 → Dm7 → Cmaj7, slow and low
+    // Rhodes-ish electric piano: soft attack, bell overtone, muffled top
+    const ep = (f, t, dur = 1.9, vol = 0.02) => {
+      for (const [mult, v] of [[1, vol], [2.004, vol * 0.28]]) {
+        const o = c.createOscillator();
+        o.type = 'sine';
+        o.frequency.value = f * mult;
+        const filt = c.createBiquadFilter();
+        filt.type = 'lowpass';
+        filt.frequency.value = 1800;
+        const g = c.createGain();
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(v, t + 0.015);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        o.connect(filt).connect(g).connect(master);
+        o.start(t);
+        o.stop(t + dur + 0.1);
+      }
+    };
+    const bass = (f, t, dur) => {
+      const o = c.createOscillator();
+      o.type = 'sine';
+      o.frequency.value = f;
+      const g = c.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.035, t + 0.04);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g).connect(master);
+      o.start(t);
+      o.stop(t + dur + 0.1);
+    };
+    const kick = (t, vol = 0.08) => {
+      const o = c.createOscillator();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(105, t);
+      o.frequency.exponentialRampToValueAtTime(45, t + 0.11);
+      const g = c.createGain();
+      g.gain.setValueAtTime(vol, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.24);
+      o.connect(g).connect(master);
+      o.start(t);
+      o.stop(t + 0.3);
+    };
+    const snare = (t) => noiseHit(t, { dur: 0.16, vol: 0.026, type: 'bandpass', freq: 1900, q: 0.8 });
+    const hat = (t, vol) => noiseHit(t, { dur: 0.04, vol, type: 'highpass', freq: 6500 });
+
+    // ~74bpm lofi study loop with swing: Fmaj7 → Em7 → Dm7 → Cmaj7
     const CHORDS = [
       [174.61, 220.0, 261.63, 329.63],
       [164.81, 196.0, 246.94, 293.66],
       [146.83, 174.61, 220.0, 261.63],
       [130.81, 164.81, 196.0, 246.94],
     ];
-    const PENTA = [392.0, 440.0, 523.25, 587.33, 659.25, 783.99];
-    const BAR = 3.6;
+    const PENTA = [349.23, 392.0, 440.0, 523.25, 587.33, 698.46];
+    const BEAT = 60 / 74;
+    const BAR = BEAT * 4;
+    const SWING = BEAT * 0.14; // off-eighths land late — that lazy lofi feel
     let bar = 0;
     let nextBar = c.currentTime + 0.15;
     const scheduleBar = () => {
+      const t0 = nextBar;
       const chord = CHORDS[bar % CHORDS.length];
-      chord.forEach((f, i) => padNote(f, nextBar + i * 0.04, BAR + 1));
-      bassNote(chord[0] / 2, nextBar, BAR);
-      const n = 1 + ((Math.random() * 3) | 0);
-      for (let i = 0; i < n; i++) {
-        if (Math.random() < 0.85) pluck(PENTA[(Math.random() * PENTA.length) | 0], nextBar + 0.5 + Math.random() * (BAR - 1.2));
+      // chord stab on 1, softer echo stab on the and-of-2 most bars
+      chord.forEach((f, i) => ep(f, t0 + i * 0.03));
+      if (Math.random() < 0.7) chord.forEach((f, i) => ep(f, t0 + BEAT * 1.5 + SWING + i * 0.03, 1.2, 0.011));
+      // bass: root on 1, root or fifth on 3
+      bass(chord[0] / 2, t0, BEAT * 1.6);
+      bass((Math.random() < 0.4 ? chord[2] : chord[0]) / 2, t0 + BEAT * 2, BEAT * 1.4);
+      // drums: kicks on 1 & 3 (ghost before 4 sometimes), snares on 2 & 4, swung hats
+      kick(t0);
+      kick(t0 + BEAT * 2, 0.06);
+      if (Math.random() < 0.3) kick(t0 + BEAT * 2.75, 0.04);
+      snare(t0 + BEAT);
+      snare(t0 + BEAT * 3);
+      for (let i = 0; i < 8; i++) {
+        if (Math.random() < 0.12) continue; // dropped hats keep it human
+        hat(t0 + BEAT * (i / 2) + (i % 2 ? SWING : 0), 0.007 + Math.random() * 0.006);
+      }
+      // vinyl crackle pops
+      for (let i = 0, n = 2 + ((Math.random() * 4) | 0); i < n; i++) {
+        noiseHit(t0 + Math.random() * BAR, { dur: 0.02, vol: 0.004 + Math.random() * 0.007, type: 'highpass', freq: 2500 });
+      }
+      // a lazy pentatonic sprinkle now and then
+      if (Math.random() < 0.6) {
+        const f = PENTA[(Math.random() * PENTA.length) | 0] / (Math.random() < 0.3 ? 2 : 1);
+        ep(f, t0 + BEAT * (1 + ((Math.random() * 5) | 0) * 0.5) + SWING, 1.4, 0.013);
       }
       bar++;
       nextBar += BAR;
