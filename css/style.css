@@ -428,7 +428,8 @@ details.done-details summary:hover { color: var(--ink); }
 }
 .dur-chip:hover { border-color: var(--olive); }
 .dur-chip.sel { border-color: var(--olive); background: var(--olive-soft); color: var(--olive-2); }
-.dur-custom { width: 76px !important; text-align: center; border-radius: 999px !important; }
+.dur-custom { width: 86px !important; text-align: center; border-radius: 999px !important; }
+.dur-label { min-width: 40px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; font-size: 10px !important; }
 .skill-pick { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin: 14px 0 4px; }
 .skill-chip {
   display: inline-flex; align-items: center; gap: 6px;
@@ -492,6 +493,8 @@ details.done-details summary:hover { color: var(--ink); }
   pointer-events: none; opacity: 0; transition: opacity 0.12s; white-space: nowrap; z-index: 3;
 }
 .scene-tip.show { opacity: 1; }
+.scene-plant.sel .scene-lift { filter: drop-shadow(0 0 6px var(--olive-2)); }
+.plant-card.selected { border-color: var(--olive); box-shadow: 0 0 0 3px rgba(124, 139, 79, 0.15); }
 .scene-plant .scene-lift { transition: transform 0.25s ease; }
 .scene-plant:hover .scene-lift { transform: translateY(-6px); }
 .banner-overlay {

@@ -449,7 +449,8 @@ function setupCard() {
   const durs = [15, 25, 45, 60];
   const customIn = el('input', {
     class: 'input dur-custom', type: 'number', min: '1', max: '240', id: 'dur-custom-in',
-    placeholder: '…', value: durs.includes(selDur) ? '' : selDur,
+    placeholder: 'custom', 'aria-label': 'custom study minutes', title: 'Type any number of minutes',
+    value: durs.includes(selDur) ? '' : selDur,
     onInput: (e) => { const v = parseInt(e.target.value, 10); if (v > 0) { selDur = Math.min(v, 240); refreshDur(); } },
   });
   const durChips = durs.map((d) => el('button', {
@@ -466,10 +467,11 @@ function setupCard() {
   }, `${b}m break`));
   const breakCustom = el('input', {
     class: 'input dur-custom', type: 'number', min: '1', max: '60', 'aria-label': 'custom break minutes',
-    placeholder: '…', value: BREAKS.includes(selBreak) ? '' : selBreak,
+    placeholder: 'custom', title: 'Type any number of minutes', value: BREAKS.includes(selBreak) ? '' : selBreak,
     onInput: (e) => { const v = parseInt(e.target.value, 10); if (v > 0) { selBreak = Math.min(v, 60); syncBreak(); } },
   });
-  const breakRow = el('div', { class: 'dur-chips', style: { display: selMode === 'cycle' ? '' : 'none', margin: '4px 0 0' } }, ...breakChips, breakCustom);
+  const breakRow = el('div', { class: 'dur-chips', style: { display: selMode === 'cycle' ? '' : 'none', margin: '4px 0 0' } },
+    el('span', { class: 'dur-label muted small' }, 'break'), ...breakChips, breakCustom);
   const modeChips = [['single', 'Single session'], ['cycle', 'Cycles']].map(([m, label]) => el('button', {
     class: 'dur-chip' + (selMode === m ? ' sel' : ''), dataset: { mode: m },
     onClick: () => {
@@ -503,7 +505,7 @@ function setupCard() {
           el('button', { class: 'btn btn-primary btn-big', onClick: async () => { const sk = await openSkillEditor(); if (sk) { selSkillId = sk.id; store.notify(); } } }, ic('pot', { size: 15 }), 'Plant your first skill'),
         ),
     el('div', { class: 'dur-chips', style: { marginBottom: '2px' } }, ...modeChips),
-    el('div', { class: 'dur-chips' }, ...durChips, customIn),
+    el('div', { class: 'dur-chips' }, el('span', { class: 'dur-label muted small' }, 'study'), ...durChips, customIn),
     breakRow,
     el('div', { style: { marginTop: '14px' } }, startBtn),
   );

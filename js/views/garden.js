@@ -114,10 +114,10 @@ function openSkillDetails(sk) {
   const close = openModal(content);
 }
 
-function plantCard(sk, rr) {
+function plantCard(sk, rr, selected = false) {
   const lv = levelOf(sk.id);
   const week = weekMinutes(sk.id);
-  return el('div', { class: 'card plant-card', dataset: { skill: sk.name } },
+  return el('div', { class: 'card plant-card' + (selected ? ' selected' : ''), dataset: { skill: sk.name } },
     el('span', { class: 'chip lilac lvl-badge' }, `lv ${lv.level} · ${stageName(lv.level)}`),
     el('div', {
       class: 'plant-wrap', html: plantSVG(sk, lv.level, 104), style: { cursor: 'pointer' },
@@ -174,6 +174,9 @@ export function render(root) {
   },
     el('div', { html: scene }),
     sceneTip,
+  );
+  if (topSk) banner.querySelector(`.scene-plant[data-skill-id="${topSk.id}"]`)?.classList.add('sel');
+  banner.append(
     el('div', { class: 'banner-overlay' },
       el('div', { class: 'banner-line1' }, grown ? `You've grown ${fmtMin(total)}`.toUpperCase() : 'YOUR GARDEN AWAITS'),
       el('div', { class: 'banner-line2' }, grown
@@ -201,7 +204,7 @@ export function render(root) {
     tierStrip,
     skills.length
       ? el('div', { class: 'garden-grid' },
-          ...skills.map((sk) => plantCard(sk, rr)),
+          ...skills.map((sk) => plantCard(sk, rr, sk.id === topSk?.id)),
           el('button', { class: 'new-plant-card', onClick: () => openSkillEditor() },
             el('span', { class: 'plus' }, ic('pot', { size: 30 })), 'Plant a new skill'),
         )
