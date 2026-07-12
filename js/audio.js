@@ -87,9 +87,13 @@ export function startMusic() {
   try {
     const c = ac();
     const master = c.createGain();
-    master.gain.setValueAtTime(0.0001, c.currentTime);
-    master.gain.exponentialRampToValueAtTime(1, c.currentTime + 3);
-    master.connect(c.destination);
+    master.gain.setValueAtTime(0, c.currentTime);
+    master.gain.linearRampToValueAtTime(1, c.currentTime + 1.2);
+    // gentle glue so the fuller mix stays smooth, never spiky
+    const comp = c.createDynamicsCompressor();
+    comp.threshold.value = -24;
+    comp.ratio.value = 4;
+    master.connect(comp).connect(c.destination);
 
     // dusty vinyl bed under everything
     const air = noiseSource(c, 'brown');
@@ -97,11 +101,11 @@ export function startMusic() {
     airF.type = 'lowpass';
     airF.frequency.value = 240;
     const airG = c.createGain();
-    airG.gain.value = 0.006;
+    airG.gain.value = 0.008;
     air.connect(airF).connect(airG).connect(master);
     air.start();
 
-    musicNodes = [master, air, airF, airG];
+    musicNodes = [master, air, airF, airG, comp];
 
     // one shared noise buffer; every hat/snare/crackle is a cheap slice of it
     const noiseBuf = (() => {
@@ -124,7 +128,7 @@ export function startMusic() {
     };
 
     // Rhodes-ish electric piano: soft attack, bell overtone, muffled top
-    const ep = (f, t, dur = 1.9, vol = 0.02) => {
+    const ep = (f, t, dur = 2.4, vol = 0.042) => {
       for (const [mult, v] of [[1, vol], [2.004, vol * 0.28]]) {
         const o = c.createOscillator();
         o.type = 'sine';
@@ -147,13 +151,13 @@ export function startMusic() {
       o.frequency.value = f;
       const g = c.createGain();
       g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(0.035, t + 0.04);
+      g.gain.exponentialRampToValueAtTime(0.065, t + 0.04);
       g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
       o.connect(g).connect(master);
       o.start(t);
       o.stop(t + dur + 0.1);
     };
-    const kick = (t, vol = 0.08) => {
+    const kick = (t, vol = 0.12) => {
       const o = c.createOscillator();
       o.type = 'sine';
       o.frequency.setValueAtTime(105, t);
@@ -165,7 +169,7 @@ export function startMusic() {
       o.start(t);
       o.stop(t + 0.3);
     };
-    const snare = (t) => noiseHit(t, { dur: 0.16, vol: 0.026, type: 'bandpass', freq: 1900, q: 0.8 });
+    const snare = (t) => noiseHit(t, { dur: 0.16, vol: 0.042, type: 'bandpass', freq: 1900, q: 0.8 });
     const hat = (t, vol) => noiseHit(t, { dur: 0.04, vol, type: 'highpass', freq: 6500 });
 
     // ~74bpm lofi study loop with swing: Fmaj7 → Em7 → Dm7 → Cmaj7
@@ -186,19 +190,19 @@ export function startMusic() {
       const chord = CHORDS[bar % CHORDS.length];
       // chord stab on 1, softer echo stab on the and-of-2 most bars
       chord.forEach((f, i) => ep(f, t0 + i * 0.03));
-      if (Math.random() < 0.7) chord.forEach((f, i) => ep(f, t0 + BEAT * 1.5 + SWING + i * 0.03, 1.2, 0.011));
+      if (Math.random() < 0.7) chord.forEach((f, i) => ep(f, t0 + BEAT * 1.5 + SWING + i * 0.03, 1.2, 0.022));
       // bass: root on 1, root or fifth on 3
       bass(chord[0] / 2, t0, BEAT * 1.6);
       bass((Math.random() < 0.4 ? chord[2] : chord[0]) / 2, t0 + BEAT * 2, BEAT * 1.4);
       // drums: kicks on 1 & 3 (ghost before 4 sometimes), snares on 2 & 4, swung hats
       kick(t0);
-      kick(t0 + BEAT * 2, 0.06);
-      if (Math.random() < 0.3) kick(t0 + BEAT * 2.75, 0.04);
+      kick(t0 + BEAT * 2, 0.09);
+      if (Math.random() < 0.3) kick(t0 + BEAT * 2.75, 0.06);
       snare(t0 + BEAT);
       snare(t0 + BEAT * 3);
       for (let i = 0; i < 8; i++) {
         if (Math.random() < 0.12) continue; // dropped hats keep it human
-        hat(t0 + BEAT * (i / 2) + (i % 2 ? SWING : 0), 0.007 + Math.random() * 0.006);
+        hat(t0 + BEAT * (i / 2) + (i % 2 ? SWING : 0), 0.011 + Math.random() * 0.008);
       }
       // vinyl crackle pops
       for (let i = 0, n = 2 + ((Math.random() * 4) | 0); i < n; i++) {
@@ -207,7 +211,7 @@ export function startMusic() {
       // a lazy pentatonic sprinkle now and then
       if (Math.random() < 0.6) {
         const f = PENTA[(Math.random() * PENTA.length) | 0] / (Math.random() < 0.3 ? 2 : 1);
-        ep(f, t0 + BEAT * (1 + ((Math.random() * 5) | 0) * 0.5) + SWING, 1.4, 0.013);
+        ep(f, t0 + BEAT * (1 + ((Math.random() * 5) | 0) * 0.5) + SWING, 1.4, 0.026);
       }
       bar++;
       nextBar += BAR;
@@ -248,11 +252,12 @@ export function syncMusic() {
   else stopMusic();
 }
 
+// UI sounds: soft, round sines at low volume — felt more than heard
 export const sfx = {
-  click: () => tone(660, { dur: 0.07, vol: 0.07, type: 'triangle' }),
-  pop: () => { tone(520, { dur: 0.09, type: 'triangle' }); tone(784, { t: 0.07, dur: 0.13, type: 'triangle' }); },
-  start: () => { tone(440, { dur: 0.1, type: 'sine' }); tone(660, { t: 0.1, dur: 0.16, type: 'sine' }); },
+  click: () => tone(494, { dur: 0.09, vol: 0.028, type: 'sine', glide: 0.94 }),
+  pop: () => { tone(440, { dur: 0.1, vol: 0.05, type: 'sine' }); tone(659, { t: 0.08, dur: 0.14, vol: 0.045, type: 'sine' }); },
+  start: () => { tone(392, { dur: 0.12, vol: 0.055, type: 'sine' }); tone(587, { t: 0.11, dur: 0.18, vol: 0.05, type: 'sine' }); },
   chime: () => playRinger(),
-  level: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, { t: i * 0.09, dur: 0.32, type: 'triangle' })),
-  uhoh: () => { tone(330, { dur: 0.12, type: 'triangle' }); tone(262, { t: 0.11, dur: 0.18, type: 'triangle' }); },
+  level: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, { t: i * 0.09, dur: 0.32, vol: 0.09, type: 'sine' })),
+  uhoh: () => { tone(330, { dur: 0.14, vol: 0.045, type: 'sine' }); tone(277, { t: 0.13, dur: 0.2, vol: 0.045, type: 'sine' }); },
 };
