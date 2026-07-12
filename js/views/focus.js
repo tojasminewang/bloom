@@ -12,9 +12,6 @@ import { ic } from '../icons.js';
 
 let selSkillId = null;
 let selDur = 25;
-let selMode = 'single'; // 'single' | 'cycle'
-let selBreak = 5;
-let selFirst = 'study'; // 'study' | 'break' — cycles can ease in with the break first (à la Pomofocus)
 let selTab = 'focus'; // 'focus' | 'short' | 'long' — Pomofocus-style tabs; breaks run standalone
 let selShort = 5;
 let selLong = 15;
@@ -103,11 +100,9 @@ export function setFocusSkill(id) { selSkillId = id; }
 
 function startTimer(skillId, minutes) {
   const workSec = Math.round(minutes * 60);
-  const breakFirst = selMode === 'cycle' && selFirst === 'break';
   store.state.timer = {
-    // break-first cycles open on the break at round 0 — completing it rolls into round 1 of work
-    skillId, durationSec: breakFirst ? selBreak * 60 : workSec, workSec, breakSec: selBreak * 60,
-    mode: selMode, phase: breakFirst ? 'break' : 'work', round: breakFirst ? 0 : 1,
+    skillId, durationSec: workSec, workSec, breakSec: 5 * 60,
+    mode: 'single', phase: 'work', round: 1,
     startedAt: Date.now(), pausedAt: null, pausedTotal: 0,
   };
   sfx.start();
@@ -487,46 +482,9 @@ function setupCard() {
     onClick: () => { selDur = d; customIn.value = ''; sfx.click(); refreshDur(); },
   }, `${d}m`));
 
-  // single session vs pomodoro cycles
-  const BREAKS = [5, 10];
-  const syncBreak = () => breakChips.forEach((c) => c.classList.toggle('sel', parseInt(c.dataset.brk, 10) === selBreak));
-  const breakChips = BREAKS.map((b) => el('button', {
-    class: 'dur-chip' + (b === selBreak ? ' sel' : ''), dataset: { brk: b },
-    onClick: () => { selBreak = b; breakCustom.value = ''; sfx.click(); syncBreak(); },
-  }, `${b}m break`));
-  const breakCustom = el('input', {
-    class: 'input dur-custom', type: 'number', min: '1', max: '60', 'aria-label': 'custom break minutes',
-    placeholder: '---', title: 'Type any number of minutes', value: BREAKS.includes(selBreak) ? '' : selBreak,
-    onInput: (e) => { const v = parseInt(e.target.value, 10); if (v > 0) { selBreak = Math.min(v, 60); syncBreak(); refreshDur(); } },
-  });
-  // cycles can open with the break — some people warm up before the first round (Pomofocus-style)
-  const firstChips = [['study', 'study first'], ['break', 'break first']].map(([v, label]) => el('button', {
-    class: 'dur-chip' + (selFirst === v ? ' sel' : ''), dataset: { first: v },
-    onClick: () => {
-      selFirst = v;
-      sfx.click();
-      firstChips.forEach((c) => c.classList.toggle('sel', c.dataset.first === selFirst));
-      refreshDur();
-    },
-  }, label));
-  const breakRow = el('div', { class: 'dur-chips', style: { display: selMode === 'cycle' ? '' : 'none', margin: '4px 0 0' } },
-    ...breakChips, breakCustom, el('span', { style: { width: '6px' } }), ...firstChips);
-  const modeChips = [['single', 'Single session'], ['cycle', 'Cycles']].map(([m, label]) => el('button', {
-    class: 'dur-chip' + (selMode === m ? ' sel' : ''), dataset: { mode: m },
-    onClick: () => {
-      selMode = m;
-      sfx.click();
-      modeChips.forEach((c) => c.classList.toggle('sel', c.dataset.mode === selMode));
-      breakRow.style.display = selMode === 'cycle' ? '' : 'none';
-      refreshDur();
-    },
-  }, m === 'cycle' ? el('span', { class: 'row', style: { gap: '5px' } }, ic('repeat', { size: 12 }), label) : label));
-
   function refreshDur() {
     durChips.forEach((c) => c.classList.toggle('sel', parseInt(c.dataset.min, 10) === selDur));
-    startBtn.textContent = selMode !== 'cycle' ? `Start ${selDur}m of focus`
-      : selFirst === 'break' ? `Start with a ${selBreak}m break`
-      : `Start ${selDur}m rounds`;
+    startBtn.textContent = `Start ${selDur}m of focus`;
   }
 
   const startBtn = el('button', {
@@ -584,9 +542,7 @@ function setupCard() {
       : el('div', { style: { margin: '16px 0' } },
           el('button', { class: 'btn btn-primary btn-big', onClick: async () => { const sk = await openSkillEditor(); if (sk) { selSkillId = sk.id; store.notify(); } } }, ic('pot', { size: 15 }), 'Plant your first skill'),
         ),
-    el('div', { class: 'dur-chips', style: { marginBottom: '2px' } }, ...modeChips),
     el('div', { class: 'dur-chips' }, ...durChips, customIn),
-    breakRow,
     el('div', { style: { marginTop: '14px' } }, startBtn),
   );
 }
