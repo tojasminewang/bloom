@@ -39,41 +39,41 @@
   --font-body: "Quicksand", "Nunito", system-ui, sans-serif;
 }
 [data-theme="dark"] {
-  /* night garden: deep forest floor, clearly lifted moonlit cards */
-  --bg: #14180E;
-  --card: #242C1A;
-  --card-2: #2F3922;
-  --ink: #EAEEDB;
-  --ink-strong: #FAFBF1;
-  --muted: #A9B18F;
-  --line: rgba(234, 238, 219, 0.13);
-  --line-strong: rgba(234, 238, 219, 0.30);
+  /* cozy midnight: warm neutral charcoal — green lives only on plants and buttons */
+  --bg: #161513;
+  --card: #211F1C;
+  --card-2: #2B2824;
+  --ink: #EAE6DD;
+  --ink-strong: #FAF7F0;
+  --muted: #A8A296;
+  --line: rgba(234, 230, 221, 0.13);
+  --line-strong: rgba(234, 230, 221, 0.30);
   --olive: #A9BE74;
   --olive-2: #C8DC96;
-  --olive-soft: #38431F;
+  --olive-soft: #34382A;
   --green: #A3C476;
-  --green-soft: #31431F;
+  --green-soft: #2F3727;
   --coral: #E2A180;
   --coral-strong: #ECB394;
-  --coral-soft: #4C2F1F;
-  --mint-soft: #21402F;
-  --peach-soft: #4A3417;
-  --rose-soft: #492A2E;
-  --sun-soft: #4A4114;
-  --sky-soft: #1F3A4A;
-  --track: #333E1F;
+  --coral-soft: #462E22;
+  --mint-soft: #26382F;
+  --peach-soft: #453322;
+  --rose-soft: #432B2E;
+  --sun-soft: #423A1F;
+  --sky-soft: #233440;
+  --track: #35322C;
   --shadow: 0 16px 34px -16px rgba(0, 0, 0, 0.75);
   --shadow-sm: 0 3px 12px -4px rgba(0, 0, 0, 0.5);
-  --hsky1: #1B2313;
-  --hsky2: #161C0E;
-  --hsun: #E4E9C0;
-  --hill1: #26301A;
-  --htree1: #3A4823;
-  --hill2: #31401D;
-  --htree2: #475A29;
-  --hill3: #3E5023;
-  --htree3: #586F30;
-  --hflower: #EDEFD8;
+  --hsky1: #201E1B;
+  --hsky2: #181714;
+  --hsun: #E9E3CD;
+  --hill1: #2A2D20;
+  --htree1: #3E4530;
+  --hill2: #333927;
+  --htree2: #4A5535;
+  --hill3: #3F482B;
+  --htree3: #5A683D;
+  --hflower: #EDEAD8;
 }
 
 * { box-sizing: border-box; }
@@ -98,8 +98,8 @@ body::before {
 }
 [data-theme="dark"] body::before {
   background:
-    radial-gradient(640px 440px at 88% -8%, rgba(228, 233, 192, 0.05), transparent 70%),
-    radial-gradient(620px 460px at 55% 114%, rgba(169, 190, 116, 0.06), transparent 70%);
+    radial-gradient(640px 440px at 88% -8%, rgba(233, 227, 205, 0.04), transparent 70%),
+    radial-gradient(620px 460px at 55% 114%, rgba(236, 179, 148, 0.04), transparent 70%);
 }
 
 h1, h2, h3 { font-family: var(--font-display); color: var(--ink-strong); font-weight: 570; margin: 0; letter-spacing: 0.1px; }
