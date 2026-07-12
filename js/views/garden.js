@@ -114,12 +114,16 @@ function openSkillDetails(sk) {
   const close = openModal(content);
 }
 
-function plantCard(sk) {
+function plantCard(sk, rr) {
   const lv = levelOf(sk.id);
   const week = weekMinutes(sk.id);
   return el('div', { class: 'card plant-card', dataset: { skill: sk.name } },
     el('span', { class: 'chip lilac lvl-badge' }, `lv ${lv.level} · ${stageName(lv.level)}`),
-    el('div', { class: 'plant-wrap', html: plantSVG(sk, lv.level, 104), onClick: () => openSkillDetails(sk), style: { cursor: 'pointer' } }),
+    el('div', {
+      class: 'plant-wrap', html: plantSVG(sk, lv.level, 104), style: { cursor: 'pointer' },
+      title: 'Show this plant on the growth bar',
+      onClick: () => { sfx.click(); stripSkillId = sk.id; rr(); },
+    }),
     el('div', { class: 'plant-name' }, ic((sk.icon || 'sprout'), { size: 14, cls: 'title-ic' }), sk.name),
     el('div', { class: 'xp-bar', title: `${lv.into}/${lv.need} XP to next level` },
       el('div', { class: 'xp-fill', style: { width: `${Math.max(3, Math.round((lv.into / lv.need) * 100))}%` } })),
@@ -132,12 +136,15 @@ function plantCard(sk) {
   );
 }
 
+let stripSkillId = null; // which plant the growth ladder follows (click a plant to switch)
+
 export function render(root) {
   const s = store.state;
+  const rr = () => { root.replaceChildren(); render(root); };
   const skills = [...s.skills].sort((a, b) => weekMinutes(b.id) - weekMinutes(a.id) || xpOf(b.id) - xpOf(a.id));
   const st = streak();
   const total = minutesTotal();
-  const topSk = skills[0] || null;
+  const topSk = (stripSkillId && skills.find((k) => k.id === stripSkillId)) || skills[0] || null;
   const tier = gardenTier(topSk?.id ?? null);
 
   // ---- the garden itself: your real plants in the meadow (hills only while empty) ----
@@ -145,15 +152,28 @@ export function render(root) {
   const scene = skills.length
     ? gardenSceneSVG(skills.map((sk) => ({ sk, level: levelOf(sk.id).level })))
     : gardenBannerSVG({ seed: 'bloom-hills-0', trees: 10, flowers: 4 });
+  const sceneTip = el('div', { class: 'scene-tip' });
   const banner = el('div', {
     class: 'garden-banner' + (skills.length ? ' scene' : ''),
     onClick: (e) => {
       const g = e.target.closest('.scene-plant');
       const sk = g && skillById(g.dataset.skillId);
-      if (sk) { sfx.click(); openSkillDetails(sk); }
+      if (sk) { sfx.click(); stripSkillId = sk.id; rr(); }
     },
+    onMousemove: (e) => {
+      const g = e.target.closest('.scene-plant');
+      if (!g) { sceneTip.classList.remove('show'); return; }
+      sceneTip.textContent = `${g.dataset.name} · lv ${g.dataset.level}`;
+      const r = banner.getBoundingClientRect();
+      const gr = g.getBoundingClientRect();
+      sceneTip.style.left = `${gr.left - r.left + gr.width / 2}px`;
+      sceneTip.style.top = `${gr.top - r.top - 8}px`;
+      sceneTip.classList.add('show');
+    },
+    onMouseleave: () => sceneTip.classList.remove('show'),
   },
     el('div', { html: scene }),
+    sceneTip,
     el('div', { class: 'banner-overlay' },
       el('div', { class: 'banner-line1' }, grown ? `You've grown ${fmtMin(total)}`.toUpperCase() : 'YOUR GARDEN AWAITS'),
       el('div', { class: 'banner-line2' }, grown
@@ -181,7 +201,7 @@ export function render(root) {
     tierStrip,
     skills.length
       ? el('div', { class: 'garden-grid' },
-          ...skills.map(plantCard),
+          ...skills.map((sk) => plantCard(sk, rr)),
           el('button', { class: 'new-plant-card', onClick: () => openSkillEditor() },
             el('span', { class: 'plus' }, ic('pot', { size: 30 })), 'Plant a new skill'),
         )

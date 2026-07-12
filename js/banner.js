@@ -111,8 +111,7 @@ export function gardenSceneSVG(plants) {
     const x = startX + gap * i;
     const y = 240 + (rnd() * 10 - 5);
     const inner = plantSVG(p.sk, p.level, w);
-    out += `<g class="scene-plant" data-skill-id="${p.sk.id}" transform="translate(${(x - w / 2).toFixed(1)},${(y - h).toFixed(1)})">
-      <title>${esc(p.sk.name)} · lv ${p.level} — click for details</title>
+    out += `<g class="scene-plant" data-skill-id="${p.sk.id}" data-name="${esc(p.sk.name)}" data-level="${p.level}" transform="translate(${(x - w / 2).toFixed(1)},${(y - h).toFixed(1)})">
       <g class="scene-lift">${inner}</g>
     </g>`;
   });

@@ -485,6 +485,13 @@ details.done-details summary:hover { color: var(--ink); }
 .garden-banner.scene > div > svg { height: 256px; }
 .garden-banner.scene .banner-overlay { justify-content: flex-start; padding: 22px 20px 0; pointer-events: none; }
 .scene-plant { cursor: pointer; }
+.scene-tip {
+  position: absolute; transform: translate(-50%, -100%);
+  background: var(--ink-strong); color: var(--bg);
+  font-size: 11.5px; font-weight: 700; padding: 4px 9px; border-radius: 8px;
+  pointer-events: none; opacity: 0; transition: opacity 0.12s; white-space: nowrap; z-index: 3;
+}
+.scene-tip.show { opacity: 1; }
 .scene-plant .scene-lift { transition: transform 0.25s ease; }
 .scene-plant:hover .scene-lift { transform: translateY(-6px); }
 .banner-overlay {
