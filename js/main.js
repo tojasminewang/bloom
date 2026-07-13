@@ -8,6 +8,7 @@ import { ic, svgStr } from './icons.js';
 import { startTour } from './tour.js';
 import { plantSVG, SPECIES } from './plant.js';
 import * as cloud from './cloud.js';
+import { initReminders, requestNotify, notifyPermission, notifySupported } from './reminders.js';
 import * as today from './views/today.js';
 import * as tasks from './views/tasks.js';
 import * as calendar from './views/calendar.js';
@@ -94,6 +95,41 @@ function openSettings() {
     },
   }, r.label));
   ringerRow.append(...ringerChips);
+
+  // ---- daily reminder: a gentle nudge to come water the garden ----
+  const reminderBox = el('div', {});
+  const renderReminder = () => {
+    const timeIn = el('input', {
+      class: 'input', type: 'time', value: s.reminderTime || '19:00', style: { width: 'auto' },
+      onChange: (e) => { s.reminderTime = e.target.value || '19:00'; store.save(true); },
+    });
+    const hintFor = () => {
+      if (!notifySupported()) return 'While Bloom is open we’ll nudge you at this time.';
+      const p = notifyPermission();
+      if (p === 'denied') return 'Notifications are blocked in your browser — you’ll still get an in-app nudge when you open Bloom.';
+      if (p === 'granted') return 'You’ll get a notification at this time when Bloom is open, and a nudge next time you visit.';
+      return 'We’ll ask to send notifications when you turn this on.';
+    };
+    const hint = el('p', { class: 'muted small', style: { marginTop: '6px' } }, hintFor());
+    const toggle = el('button', {
+      class: 'chip chip-btn' + (s.reminder ? ' sel' : ''),
+      onClick: async () => {
+        s.reminder = !s.reminder;
+        if (s.reminder) { await requestNotify(); if (notifyPermission() === 'granted') initReminders(); }
+        store.save(true);
+        sfx.pop();
+        renderReminder();
+      },
+    }, ic(s.reminder ? 'bell' : 'bell-off', { size: 12 }), s.reminder ? ' reminder on' : ' reminder off');
+    reminderBox.replaceChildren(
+      el('div', { class: 'row gap wrap', style: { alignItems: 'center' } },
+        toggle,
+        s.reminder ? el('span', { class: 'row', style: { gap: '6px', alignItems: 'center' } }, el('span', { class: 'muted small' }, 'at'), timeIn) : null,
+      ),
+      hint,
+    );
+  };
+  renderReminder();
 
   // ---- account: email → code → synced garden (hidden until cloud is configured) ----
   const accountBox = el('div', {});
@@ -191,6 +227,8 @@ function openSettings() {
     el('div', { class: 'field-label' }, 'Timer ringer'),
     ringerRow,
     el('p', { class: 'muted small', style: { marginTop: '6px' } }, 'Tap one to hear it — it plays when a focus session finishes.'),
+    el('div', { class: 'field-label' }, 'Daily reminder'),
+    reminderBox,
     el('div', { class: 'field-label' }, 'Start over'),
     el('div', { class: 'row gap wrap' },
       el('button', {
@@ -433,6 +471,7 @@ applyTheme();
 route();
 if (!authReturn) maybeOnboard(); // just signed in → their garden is about to sync down, don't onboard over it
 cloud.initCloud(); // account + sync, if configured
+initReminders(); // daily nudge to water the garden, if switched on
 syncMusic(); // gentle garden music, on by default (starts after first click per browser rules)
 setTimeout(checkKeepsakes, 800);
 
