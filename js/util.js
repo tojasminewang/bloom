@@ -171,7 +171,18 @@ export function eventOccursOn(ev, date) {
   if (ev.repeat === 'daily') return true;
   if (ev.repeat === 'weekly') return fromYmd(date).getDay() === fromYmd(ev.date).getDay();
   if (ev.repeat === 'monthly') return date.slice(8) === ev.date.slice(8);
+  if (ev.repeat === 'days') return Array.isArray(ev.days) && ev.days.includes(fromYmd(date).getDay());
   return false;
+}
+
+// human-readable recurrence: 'daily' / 'weekly' / 'monthly' / 'Tue, Thu' / 'weekdays'
+export function repeatLabel(ev) {
+  if (ev.repeat !== 'days') return ev.repeat || '';
+  const d = [...(ev.days || [])].sort((a, b) => a - b);
+  if (d.length === 7) return 'daily';
+  if (d.length === 5 && d.every((x) => x >= 1 && x <= 5)) return 'weekdays';
+  if (d.length === 2 && d.includes(0) && d.includes(6)) return 'weekends';
+  return d.map((x) => DAYS[x]).join(', ');
 }
 
 export function guessIcon(name) {

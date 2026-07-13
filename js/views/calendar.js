@@ -1,5 +1,5 @@
 // views/calendar.js — month grid where events, task due-dates and focus sessions all meet.
-import { el, ymd, fromYmd, todayYmd, fmtMonth, fmtDate, fmtMin, fmtTime, parseTimeInput, pad2, addDays, dayDiff, eventOccursOn } from '../util.js';
+import { el, ymd, fromYmd, todayYmd, fmtMonth, fmtDate, fmtMin, fmtTime, parseTimeInput, pad2, addDays, dayDiff, eventOccursOn, repeatLabel } from '../util.js';
 import { store, uid, PALETTE } from '../store.js';
 import { confirmDialog, choiceDialog, toast } from '../ui.js';
 import { sfx } from '../audio.js';
@@ -194,13 +194,35 @@ function dayPanel(rr) {
       sfx.click();
     },
   }, el('span', {}, evImportant ? '★' : '☆'), ' important');
-  const repeatSel = el('select', { class: 'input', id: 'event-repeat-in', style: { width: 'auto' }, onChange: (e) => { if (!editing) eventDraft.repeat = e.target.value; } },
+  // per-weekday recurrence: picking "certain days" reveals S M T W T F S toggles
+  let evDays = new Set(editing ? (editing.repeat === 'days' ? editing.days || [] : []) : (eventDraft.days || []));
+  const DOW = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+  const dayChips = DOW.map((lbl, i) => el('button', {
+    type: 'button', class: 'chip chip-btn day-chip' + (evDays.has(i) ? ' sel' : ''), dataset: { dow: i },
+    'aria-label': ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][i],
+    onClick: (e) => {
+      if (evDays.has(i)) evDays.delete(i); else evDays.add(i);
+      e.currentTarget.classList.toggle('sel', evDays.has(i));
+      if (!editing) eventDraft.days = [...evDays];
+      sfx.click();
+    },
+  }, lbl));
+  const dayRow = el('div', { class: 'row', style: { gap: '4px', marginTop: '4px', display: 'none' } }, ...dayChips);
+  const repeatSel = el('select', {
+    class: 'input', id: 'event-repeat-in', style: { width: 'auto' },
+    onChange: (e) => {
+      if (!editing) eventDraft.repeat = e.target.value;
+      dayRow.style.display = e.target.value === 'days' ? '' : 'none';
+    },
+  },
     el('option', { value: '' }, 'once'),
     el('option', { value: 'daily' }, 'daily'),
     el('option', { value: 'weekly' }, 'weekly'),
     el('option', { value: 'monthly' }, 'monthly'),
+    el('option', { value: 'days' }, 'certain days…'),
   );
   repeatSel.value = editing ? (editing.repeat || '') : (eventDraft.repeat || '');
+  dayRow.style.display = repeatSel.value === 'days' ? '' : 'none';
 
   async function submit() {
     const title = titleIn.value.trim();
@@ -213,11 +235,17 @@ function dayPanel(rr) {
       timeIn.focus();
       return;
     }
-    const vals = { title, time, color: evColor, important: evImportant, repeat: repeatSel.value || null };
+    const repeat = repeatSel.value || null;
+    if (repeat === 'days' && evDays.size === 0) {
+      sfx.uhoh();
+      toast('Pick at least one day to repeat on', 'clock');
+      return;
+    }
+    const vals = { title, time, color: evColor, important: evImportant, repeat, days: repeat === 'days' ? [...evDays] : null };
     if (editing) {
       // repeating event: ask what the edit applies to (like Google Calendar)
       if (editing.repeat && vals.repeat) {
-        const scope = await choiceDialog(`“${editing.title}” repeats ${editing.repeat} — change what?`, [
+        const scope = await choiceDialog(`“${editing.title}” repeats ${repeatLabel(editing)} — change what?`, [
           { label: 'Just this day', value: 'one' },
           { label: 'All days', value: 'all' },
         ]);
@@ -236,7 +264,7 @@ function dayPanel(rr) {
       editingId = null;
     } else {
       store.state.events.push({ id: uid(), ...vals, date: selected, except: [], createdAt: new Date().toISOString() });
-      Object.assign(eventDraft, { title: '', time: '', color: '#D89B8A', repeat: '', important: false });
+      Object.assign(eventDraft, { title: '', time: '', color: '#D89B8A', repeat: '', days: [], important: false });
     }
     sfx.click();
     store.save();
@@ -271,7 +299,7 @@ function dayPanel(rr) {
           el('span', { class: 'event-title' },
             ev.important ? el('span', { class: 'event-star', title: 'important' }, '★ ') : null,
             ev.title,
-            ev.repeat ? el('span', { class: 'chip lilac', style: { marginLeft: '7px' } }, ic('repeat', { size: 10 }), ev.repeat) : null),
+            ev.repeat ? el('span', { class: 'chip lilac', style: { marginLeft: '7px' } }, ic('repeat', { size: 10 }), repeatLabel(ev)) : null),
           el('div', { class: 'task-actions' },
             el('button', { class: 'icon-btn', 'aria-label': 'Edit event', onClick: () => { editingId = ev.id; rr(); } }, ic('pencil', { size: 14 })),
             el('button', {
@@ -285,7 +313,7 @@ function dayPanel(rr) {
                   return;
                 }
                 // repeating event: delete what? (like Google Calendar)
-                const scope = await choiceDialog(`“${ev.title}” repeats ${ev.repeat} — delete what?`, [
+                const scope = await choiceDialog(`“${ev.title}” repeats ${repeatLabel(ev)} — delete what?`, [
                   { label: 'Just this day', value: 'one' },
                   { label: 'This and all following days', value: 'following' },
                   { label: 'All days', value: 'all', danger: true },
@@ -310,6 +338,7 @@ function dayPanel(rr) {
     el('div', { class: 'col', style: { gap: '8px', marginTop: '6px' } },
       titleIn,
       el('div', { class: 'row gap wrap', style: { alignItems: 'center' } }, timeIn, ampmChips, repeatSel, impBtn),
+      dayRow,
       colorRow,
       el('div', { class: 'row gap' },
         addBtn,

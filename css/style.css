@@ -327,6 +327,7 @@ details.done-details summary:hover { color: var(--ink); }
 .cal-ev-star { font-size: 9px; color: #E0B54F; flex-shrink: 0; line-height: 1; }
 .cal-ev.imp .cal-ev-t { font-weight: 800; color: var(--ink-strong); }
 .event-star { color: #E0B54F; }
+.day-chip { min-width: 30px; padding: 6px 0 !important; text-align: center; justify-content: center; }
 [data-theme="dark"] .cal-cell { background: var(--card-2); }
 .cal-cell:hover { border-color: var(--line-strong); }
 .cal-cell.other { opacity: 0.4; }
