@@ -368,7 +368,8 @@ function buildSidebar() {
   aside.innerHTML = '';
   const logoFlower = el('span', { class: 'logo-flower' });
   logoFlower.append(ic('daisy', { size: 22 }));
-  aside.append(el('div', { class: 'logo' }, logoFlower, el('em', {}, 'bloom')));
+  const collapseBtn = el('button', { class: 'icon-btn', id: 'sidebar-toggle', 'aria-label': 'Collapse sidebar', title: 'Collapse sidebar', onClick: toggleSidebar }, ic('arrow', { size: 16 }));
+  aside.append(el('div', { class: 'logo' }, logoFlower, el('em', {}, 'bloom'), collapseBtn));
   for (const [key, icon, label] of NAV) {
     aside.append(el('button', {
       class: 'nav-item', dataset: { view: key }, 'aria-label': label,
@@ -388,7 +389,6 @@ function buildSidebar() {
     el('button', { class: 'icon-btn', 'aria-label': 'Guide', id: 'guide-btn', title: 'Show me around', onClick: () => { sfx.click(); startTour(); } }, ic('help', { size: 16 })),
     themeBtn,
     el('button', { class: 'icon-btn', 'aria-label': 'Settings', id: 'settings-btn', onClick: openSettings }, ic('gear', { size: 16 })),
-    el('button', { class: 'icon-btn', id: 'sidebar-toggle', 'aria-label': 'Collapse sidebar', title: 'Collapse sidebar', onClick: toggleSidebar }, ic('arrow', { size: 16 })),
   ));
   applySidebar();
 }

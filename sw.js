@@ -1,8 +1,9 @@
 // sw.js — Bloom's service worker: makes it installable + work offline.
-// Strategy: precache the app shell, then stale-while-revalidate for same-origin
-// GETs (serve cache instantly, refresh in the background). Cross-origin requests
-// (Google Fonts, Supabase auth/sync) are left untouched — they always hit network.
-const CACHE = 'bloom-v1';
+// Strategy: NETWORK-FIRST for same-origin GETs — always serve the freshest code
+// when online (so updates land immediately), fall back to cache only when offline.
+// The app shell is precached so a fully-offline first paint still works.
+// Cross-origin requests (Google Fonts, Supabase auth/sync) are left untouched.
+const CACHE = 'bloom-v2';
 const CORE = [
   './', 'index.html', 'css/style.css', 'manifest.webmanifest',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png',
@@ -27,15 +28,12 @@ self.addEventListener('fetch', (e) => {
   if (url.origin !== location.origin) return; // fonts + Supabase go straight to network
 
   e.respondWith(
-    caches.match(request).then((cached) => {
-      const network = fetch(request).then((res) => {
-        if (res && res.status === 200 && res.type === 'basic') {
-          const clone = res.clone();
-          caches.open(CACHE).then((c) => c.put(request, clone));
-        }
-        return res;
-      }).catch(() => cached || caches.match('index.html'));
-      return cached || network;
-    }),
+    fetch(request).then((res) => {
+      if (res && res.status === 200 && res.type === 'basic') {
+        const clone = res.clone();
+        caches.open(CACHE).then((c) => c.put(request, clone));
+      }
+      return res;
+    }).catch(() => caches.match(request).then((cached) => cached || caches.match('index.html'))),
   );
 });
