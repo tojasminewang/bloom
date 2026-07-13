@@ -166,8 +166,11 @@ export function render(root) {
       sceneTip.textContent = `${g.dataset.name} · lv ${g.dataset.level}`;
       const r = banner.getBoundingClientRect();
       const gr = g.getBoundingClientRect();
+      // the plant art has empty sky above it; anchor near the leaves, higher for taller plants
+      const lvl = Math.min(+g.dataset.level || 1, 12);
+      const frac = Math.max(0.28, 0.56 - (lvl / 12) * 0.26);
       sceneTip.style.left = `${gr.left - r.left + gr.width / 2}px`;
-      sceneTip.style.top = `${gr.top - r.top - 8}px`;
+      sceneTip.style.top = `${gr.top - r.top + gr.height * frac}px`;
       sceneTip.classList.add('show');
     },
     onMouseleave: () => sceneTip.classList.remove('show'),
