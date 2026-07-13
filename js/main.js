@@ -36,6 +36,9 @@ function applyTheme() {
   const dark = store.state.settings.theme === 'dark';
   document.documentElement.dataset.theme = dark ? 'dark' : 'light';
   if (themeBtn) themeBtn.innerHTML = svgStr(dark ? 'moon' : 'sun', 16);
+  // match the phone's status-bar / PWA chrome to the current theme
+  const meta = document.getElementById('theme-color-meta');
+  if (meta) meta.setAttribute('content', dark ? '#161513' : '#F4F0E2');
 }
 
 function cycleTheme() {
