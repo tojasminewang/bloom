@@ -37,14 +37,38 @@ function tierStripEl(tier, capLabel, plantName) {
   );
 }
 
+// bar chart with an instant hover tooltip showing that day's focused time
+function barsWithTip(values, labels, titles) {
+  const wrap = el('div', { class: 'chart-tip-wrap', html: barChartSVG(values, labels, { h: 56, titles }) });
+  const tip = el('div', { class: 'chart-tip' });
+  wrap.append(tip);
+  wrap.addEventListener('mousemove', (e) => {
+    const col = e.target.closest('.bar-col');
+    if (!col) { tip.classList.remove('show'); return; }
+    const min = +col.dataset.min;
+    tip.textContent = `${col.dataset.tip} · ${min ? `${fmtMin(min)} focused` : 'no focus'}`;
+    const wb = wrap.getBoundingClientRect();
+    const b = col.querySelector('.bar-rect').getBoundingClientRect();
+    tip.style.left = `${b.x - wb.x + b.width / 2}px`;
+    tip.style.top = `${Math.min(b.y - wb.y, wrap.clientHeight * 0.5) - 7}px`;
+    tip.classList.add('show');
+  });
+  wrap.addEventListener('mouseleave', () => tip.classList.remove('show'));
+  return wrap;
+}
+
 function openSkillDetails(sk) {
   const lv = levelOf(sk.id);
   const sessions = store.state.sessions.filter((s) => s.skillId === sk.id).sort((a, b) => (b.at || '').localeCompare(a.at || ''));
   const openTasks = store.state.tasks.filter((t) => !t.done && t.skillId === sk.id);
   const notes = store.state.notes.filter((n) => n.skillId === sk.id);
 
-  const labels14 = [];
-  for (let i = 13; i >= 0; i--) labels14.push(i % 3 === 0 ? fmtDateShort(addDays(todayYmd(), -i)).split(' ')[1] : '·');
+  const labels14 = [], titles14 = [];
+  for (let i = 13; i >= 0; i--) {
+    const d = addDays(todayYmd(), -i);
+    labels14.push(i % 3 === 0 ? fmtDateShort(d).split(' ')[1] : '·');
+    titles14.push(i === 0 ? 'Today' : fmtDateShort(d)); // hover shows the real date
+  }
 
   const content = el('div', {},
     el('div', { style: { textAlign: 'center' } },
@@ -61,7 +85,7 @@ function openSkillDetails(sk) {
     ),
     tierStripEl(gardenTier(sk.id), `${sk.name} now`, sk.name),
     el('div', { class: 'field-label' }, 'Last 14 days'),
-    el('div', { html: barChartSVG(lastNDays(14, sk.id), labels14, { h: 56 }) }),
+    barsWithTip(lastNDays(14, sk.id), labels14, titles14),
     el('div', { class: 'field-label' }, `Sessions · ${sessions.length}`),
     sessions.length
       ? el('div', {}, ...sessions.slice(0, 8).map((sess) =>
