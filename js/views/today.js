@@ -205,17 +205,33 @@ export function render(root) {
     el('div', { class: 'card-title' }, el('h2', {}, 'Garden ', el('em', {}, 'peek')), ic('sprout', { size: 15, cls: 'title-ic' }), el('span', { class: 'spacer' }),
       el('a', { class: 'link-btn', href: '#/garden' }, 'garden →')),
     topSkills.length
-      ? el('div', { class: 'row gap', style: { justifyContent: 'space-around', alignItems: 'flex-end' } },
+      ? el('div', { class: 'row', style: { justifyContent: 'center', gap: '44px', alignItems: 'flex-end' } },
           ...topSkills.map((sk) => {
             const lv = levelOf(sk.id);
             return el('a', { href: '#/garden', style: { textAlign: 'center', color: 'inherit' } },
-              el('div', { html: plantSVG(sk, lv.level, 74) }),
-              el('div', { class: 'row', style: { fontWeight: '800', fontSize: '12.5px', justifyContent: 'center', gap: '5px' } }, ic((sk.icon || 'sprout'), { size: 12, cls: 'title-ic' }), sk.name),
+              el('div', { class: 'peek-pot', html: plantSVG(sk, lv.level, 74) }),
+              el('div', { class: 'row', style: { fontWeight: '800', fontSize: '12.5px', justifyContent: 'center', gap: '5px', marginTop: '4px' } }, ic((sk.icon || 'sprout'), { size: 12, cls: 'title-ic' }), sk.name),
               el('div', { class: 'muted small' }, `Lv ${lv.level} · ${fmtMin(weekMinutes(sk.id))} this wk`),
             );
           }))
       : el('div', { class: 'empty' }, el('span', { class: 'big' }, ic('pot', { size: 26 })), 'No plants yet — add some time below or visit the garden.'),
   );
+  // the plant art carries empty sky above it — crop it off so labels hug the pot (zen's fitPlant trick).
+  // getBBox needs the SVG painted, so try shortly after render and once more as a safety net.
+  const cropPots = () => {
+    for (const svg of peek.querySelectorAll('.peek-pot svg')) {
+      if (svg.style.marginTop) continue; // already cropped
+      let top = Infinity;
+      for (const k of svg.children) {
+        try { const b = k.getBBox(); if (b.width || b.height) top = Math.min(top, b.y); } catch { /* not rendered */ }
+      }
+      if (!isFinite(top) || top <= 4) continue;
+      const scaleF = (svg.getBoundingClientRect().height || 92) / 150;
+      svg.style.marginTop = `${(-(top - 4) * scaleF).toFixed(1)}px`;
+    }
+  };
+  setTimeout(cropPots, 60);
+  setTimeout(cropPots, 400);
 
   // -------- up next (7 days of events incl. repeats — tasks live in the week card) --------
   const nextItems = [];

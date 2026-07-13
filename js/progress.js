@@ -7,17 +7,9 @@ import { rain } from './confetti.js';
 
 export const skillById = (id) => store.state.skills.find((s) => s.id === id);
 
-// XP = focused minutes + 10 per completed linked task (recurring tasks bank +10 per completion)
+// XP = focused minutes, plain and simple — only real time grows a plant
 export function xpOf(skillId) {
-  const s = store.state;
-  const mins = s.sessions.reduce((a, x) => a + (x.skillId === skillId ? x.minutes : 0), 0);
-  let taskXp = 0;
-  for (const t of s.tasks) {
-    if (t.skillId !== skillId) continue;
-    if (t.done) taskXp += 10;
-    taskXp += (t.completions || 0) * 10;
-  }
-  return mins + taskXp;
+  return store.state.sessions.reduce((a, x) => a + (x.skillId === skillId ? x.minutes : 0), 0);
 }
 export const levelOf = (skillId) => levelForXp(xpOf(skillId));
 

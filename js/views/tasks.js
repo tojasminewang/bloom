@@ -1,10 +1,11 @@
-// views/tasks.js — to-do list. Completing a linked task feeds its plant (+10 XP).
+// views/tasks.js — task rows + editor (used by Today and Calendar). Tasks don't give XP —
+// only focused time grows plants.
 import { el, relDue, todayYmd, ymd, dayDiff, fmtDate, nextOccurrence } from '../util.js';
 import { store, uid } from '../store.js';
 import { toast, confirmDialog } from '../ui.js';
 import { sfx } from '../audio.js';
 import { burst } from '../confetti.js';
-import { skillById, levelOf, celebrateIfLeveled } from '../progress.js';
+import { skillById } from '../progress.js';
 import { skillSelect } from '../skillEditor.js';
 import { ic } from '../icons.js';
 
@@ -13,9 +14,7 @@ let filterSkill = 'all';
 let doneOpen = false;
 
 export function toggleTask(t, ev) {
-  const before = t.skillId ? levelOf(t.skillId).level : null;
-
-  // recurring: completing banks the XP and rolls the due date forward
+  // recurring: completing rolls the due date forward
   if (t.repeat && !t.done) {
     t.doneAt = new Date().toISOString();
     t.completions = (t.completions || 0) + 1;
@@ -23,7 +22,6 @@ export function toggleTask(t, ev) {
     store.save();
     sfx.pop();
     burst(ev?.clientX || innerWidth / 2, ev?.clientY || 200, { count: 16 });
-    if (t.skillId && before != null && celebrateIfLeveled(t.skillId, before)) return;
     toast(`Done — comes back ${relDue(t.due)}`, 'repeat');
     return;
   }
@@ -34,10 +32,6 @@ export function toggleTask(t, ev) {
   if (t.done) {
     sfx.pop();
     burst(ev?.clientX || innerWidth / 2, ev?.clientY || 200, { count: 16 });
-    if (t.skillId && before != null && !celebrateIfLeveled(t.skillId, before)) {
-      const sk = skillById(t.skillId);
-      if (sk) toast(`+10 XP → ${sk.name}`, (sk.icon || 'sprout'));
-    }
   }
 }
 
@@ -99,7 +93,7 @@ function addForm() {
   });
   const dueIn = el('input', { class: 'input', type: 'date', id: 'task-due-in', value: draft.due, onInput: (e) => { draft.due = e.target.value; } });
   const skillSel = skillSelect({
-    value: draft.skillId, allowNone: true, noneLabel: 'grow a plant?', id: 'task-skill-in',
+    value: draft.skillId, allowNone: true, noneLabel: 'link a plant?', id: 'task-skill-in',
     onChange: (id) => { draft.skillId = id || ''; },
   });
   skillSel.style.width = 'auto';
@@ -183,7 +177,7 @@ export function render(root) {
           el('button', {
             class: 'link-btn', onClick: async (e) => {
               e.preventDefault(); e.stopPropagation();
-              if (await confirmDialog(`Clear ${doneTasks.length} completed ${doneTasks.length === 1 ? 'task' : 'tasks'}? Their XP stays in your garden.`, { yes: 'Clear' })) {
+              if (await confirmDialog(`Clear ${doneTasks.length} completed ${doneTasks.length === 1 ? 'task' : 'tasks'}?`, { yes: 'Clear' })) {
                 const ids = new Set(doneTasks.map((t) => t.id));
                 store.state.tasks = store.state.tasks.filter((t) => !ids.has(t.id));
                 store.save();

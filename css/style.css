@@ -238,6 +238,8 @@ input[type="date"].input, input[type="time"].input, input[type="number"].input {
 [data-theme="dark"] .chip.sun { color: #E3CE7B; }
 .chip-btn { cursor: pointer; border: 1.5px solid transparent; transition: transform 0.1s; }
 .chip-btn.disabled { opacity: 0.4; pointer-events: none; }
+.peek-pot { overflow: hidden; }
+.peek-pot svg { display: block; margin: 0 auto; }
 .chip-btn:hover { transform: scale(1.05); }
 .chip-btn.sel { border-color: var(--olive); background: var(--olive-soft); color: var(--olive-2); }
 

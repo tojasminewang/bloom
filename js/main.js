@@ -10,17 +10,15 @@ import { plantSVG, SPECIES } from './plant.js';
 import * as cloud from './cloud.js';
 import { initReminders, requestNotify, notifyPermission, notifySupported } from './reminders.js';
 import * as today from './views/today.js';
-import * as tasks from './views/tasks.js';
 import * as calendar from './views/calendar.js';
 import * as notes from './views/notes.js';
 import * as focus from './views/focus.js';
 import * as garden from './views/garden.js';
 import { checkTimer, timerRemaining, toggleZen } from './views/focus.js';
 
-const VIEWS = { today, tasks, calendar, notes, focus, garden };
+const VIEWS = { today, calendar, notes, focus, garden };
 const NAV = [
   ['today', 'sun', 'Today'],
-  ['tasks', 'check-square', 'Tasks'],
   ['calendar', 'calendar', 'Calendar'],
   ['notes', 'note', 'Notes'],
   ['focus', 'hourglass', 'Focus'],
@@ -480,18 +478,14 @@ addEventListener('keydown', (e) => {
   if (e.target.closest?.('input, textarea, select, [contenteditable]')) return;
   if (document.querySelector('.modal-overlay')) return;
   const k = e.key.toLowerCase();
-  const order = ['today', 'tasks', 'calendar', 'notes', 'focus', 'garden'];
-  if (/^[1-6]$/.test(e.key)) { location.hash = '#/' + order[+e.key - 1]; return; }
+  const order = ['today', 'calendar', 'notes', 'focus', 'garden'];
+  if (/^[1-5]$/.test(e.key)) { location.hash = '#/' + order[+e.key - 1]; return; }
   if (k === 'h') location.hash = '#/today';
   else if (k === 'c') location.hash = '#/calendar';
   else if (k === 'n') location.hash = '#/notes';
   else if (k === 'f') location.hash = '#/focus';
   else if (k === 'g') location.hash = '#/garden';
-  else if (k === 't') {
-    e.preventDefault();
-    location.hash = '#/tasks';
-    setTimeout(() => document.getElementById('task-title-in')?.focus(), 90);
-  } else if (k === 'l') {
+  else if (k === 'l') {
     e.preventDefault();
     const q = document.getElementById('quicklog');
     if (q) q.focus();

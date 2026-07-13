@@ -14,7 +14,7 @@ function welcomeNote() {
 
 Here's how everything connects:
 
-Tasks — plan your day. Link a task to a skill and finishing it feeds that plant (+10 XP).
+Today — plan your day with tasks and a simple weekly list.
 Calendar — events, task due-dates and your focus sessions all show up here.
 Focus — pick a skill, start the timer, and every minute becomes XP for your garden.
 Garden — one plant per skill. Water them with focused time and watch them grow, level by level.

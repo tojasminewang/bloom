@@ -10,7 +10,7 @@ const STEPS = [
     route: '#/today', side: 'right',
     target: () => document.querySelector('#sidebar'),
     title: 'Getting around',
-    text: 'Six little rooms — Today, Tasks, Calendar, Notes, Focus and Garden. Click any of them, any time.',
+    text: 'Five little rooms — Today, Calendar, Notes, Focus and Garden. Click any of them, any time.',
   },
   {
     route: '#/today',
