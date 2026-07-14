@@ -28,17 +28,13 @@ export function celebrateIfLeveled(skillId, before) {
 
 export function logSession({ skillId, minutes, date = todayYmd(), source = 'manual', quiet = false }) {
   const sk = skillById(skillId);
-  if (!minutes || (skillId && !sk)) return; // a deleted plant's session has nowhere to go
-  const before = sk ? levelOf(skillId).level : 0;
-  store.state.sessions.push({ id: uid(), skillId: sk ? skillId : null, minutes: Math.round(minutes), date, source, at: new Date().toISOString() });
+  if (!sk || !minutes) return; // no plant → plain timer, nothing to log
+  const before = levelOf(skillId).level;
+  store.state.sessions.push({ id: uid(), skillId, minutes: Math.round(minutes), date, source, at: new Date().toISOString() });
   store.save();
   if (!quiet) {
-    if (sk) {
-      const leveled = celebrateIfLeveled(skillId, before);
-      if (!leveled) toast(`+${fmtMin(minutes)} → ${sk.name} · ${fmtMin(minutesTotal(skillId))} total`, (sk.icon || 'sprout'));
-    } else {
-      toast(`+${fmtMin(minutes)} focused — counts toward your day`, 'hourglass');
-    }
+    const leveled = celebrateIfLeveled(skillId, before);
+    if (!leveled) toast(`+${fmtMin(minutes)} → ${sk.name} · ${fmtMin(minutesTotal(skillId))} total`, (sk.icon || 'sprout'));
   }
 }
 

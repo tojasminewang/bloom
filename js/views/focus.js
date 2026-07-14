@@ -86,15 +86,16 @@ export function completeTimer() {
       mode: 'cycle', phase: 'break', round: t.round || 1,
       startedAt: Date.now(), pausedAt: null, pausedTotal: 0,
     };
-    notifyBG('Session complete', `${sk ? `+${minutes}m to ${name}` : `+${minutes}m of focus`} — ${Math.round(t.breakSec / 60)} minute break now`);
+    notifyBG('Session complete', `${sk ? `+${minutes}m to ${name}` : `${minutes}m of focus done`} — ${Math.round(t.breakSec / 60)} minute break now`);
   } else {
     store.state.timer = null;
     document.title = 'Bloom';
-    notifyBG('Session complete', `${sk ? `+${minutes}m to ${name}` : `+${minutes}m of focus`} — lovely work.`);
+    notifyBG('Session complete', sk ? `+${minutes}m to ${name} — lovely work.` : 'Lovely work.');
   }
   sfx.chime();
   rain();
-  logSession({ skillId, minutes, source: 'timer' }); // saves + notifies + level-up celebration
+  if (sk) logSession({ skillId, minutes, source: 'timer' }); // saves + notifies + level-up celebration
+  else { toast('Timer done — lovely work', 'hourglass'); store.save(); }
 }
 
 export function setFocusSkill(id) { selSkillId = id; }
@@ -176,9 +177,11 @@ async function endEarly({ discardable } = {}) {
   }
   const elapsedMin = Math.floor(timerElapsedSec() / 60);
   if (discardable) {
-    const msg = elapsedMin >= 1
-      ? `End this session early? Your ${fmtMin(elapsedMin)} still gets logged — no minute wasted.`
-      : 'End this session? Nothing to log yet (under a minute).';
+    const msg = !skillById(t.skillId)
+      ? 'End this timer? No plant selected, so nothing gets logged.'
+      : elapsedMin >= 1
+        ? `End this session early? Your ${fmtMin(elapsedMin)} still gets logged — no minute wasted.`
+        : 'End this session? Nothing to log yet (under a minute).';
     if (!(await confirmDialog(msg, { yes: 'End session', no: 'Keep going' }))) return;
   }
   const skillId = t.skillId;
@@ -455,7 +458,7 @@ function runningCard() {
     : t.mode === 'cycle'
       ? `round ${t.round || 1} · ${fmtMin(Math.round(t.workSec / 60))} work + ${fmtMin(Math.round(t.breakSec / 60))} break, repeating`
       : free
-        ? `${fmtMin(Math.round(t.durationSec / 60))} session · no plant, still counts toward your day`
+        ? `${fmtMin(Math.round(t.durationSec / 60))} timer · no plant — nothing gets logged`
         : `${fmtMin(Math.round(t.durationSec / 60))} session · every minute = 1 XP`;
 
   return el('div', { class: 'card focus-hero' },
@@ -470,7 +473,7 @@ function runningCard() {
         ic(paused ? 'play' : 'pause', { size: 13 }), paused ? 'Resume' : 'Pause'),
       onBreak
         ? el('button', { class: 'btn btn-green', id: 'timer-skip-btn', onClick: skipBreak }, ic('play', { size: 13 }), 'Skip break')
-        : el('button', { class: 'btn btn-green', id: 'timer-finish-btn', onClick: () => endEarly({ discardable: false }) }, ic('check', { size: 13 }), 'Finish & log'),
+        : el('button', { class: 'btn btn-green', id: 'timer-finish-btn', onClick: () => endEarly({ discardable: false }) }, ic('check', { size: 13 }), free ? 'Finish' : 'Finish & log'),
       el('button', { class: 'btn', id: 'timer-zen-btn', title: 'Zen fullscreen (z)', onClick: toggleZen }, ic('expand', { size: 13 }), 'Zen'),
       pipSupported()
         ? el('button', { class: 'btn', id: 'timer-pip-btn', title: 'Pop out a floating timer — stays on top while you work in other apps', onClick: openPip }, ic('pip', { size: 13 }), 'Pop out')
@@ -557,9 +560,7 @@ function setupCard() {
   return el('div', { class: 'card focus-hero' },
     tabRow,
     el('h2', {}, 'Grow some ', el('em', { class: 'squiggle' }, 'focus')),
-    el('p', { class: 'muted', style: { marginTop: '10px' } }, selSkillId === FREE
-      ? 'No plant this time — your minutes still count toward the day.'
-      : 'Pick a plant, pick a time. Every focused minute becomes XP.'),
+    el('p', { class: 'muted', style: { marginTop: '10px' } }, 'Pick a plant, pick a time. Every focused minute becomes XP.'),
     s.skills.length
       ? el('div', { class: 'skill-pick' }, ...chips)
       : el('div', { style: { margin: '16px 0' } },
