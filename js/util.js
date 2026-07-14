@@ -117,8 +117,9 @@ export function shade(hex, pct) {
 
 // XP → level. Each level costs min(60·level, 900) XP; 1 focused minute = 1 XP.
 export function levelForXp(xp) {
-  let level = 1, into = Math.max(0, Math.round(xp)), need = 60;
-  while (into >= need && level < 99) { into -= need; level++; need = Math.min(60 * level, 900); }
+  // 1.5h to level 2, then +1.5h per level (3h, 4.5h, …) capped at 20h a level
+  let level = 1, into = Math.max(0, Math.round(xp)), need = 90;
+  while (into >= need && level < 99) { into -= need; level++; need = Math.min(90 * level, 1200); }
   return { level, into, need };
 }
 

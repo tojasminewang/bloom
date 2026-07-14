@@ -78,7 +78,9 @@ function focusChartWithTip(values, labels, titles) {
     tip.textContent = `${col.dataset.tip} · ${min ? `${fmtMin(min)} focused` : 'no focus'}`;
     const wb = wrap.getBoundingClientRect();
     const b = col.querySelector('.bar-rect').getBoundingClientRect();
-    tip.style.left = `${b.x - wb.x + b.width / 2}px`;
+    // clamp inside the card so edge bars don't get their bubble cut off
+    const half = tip.offsetWidth / 2 + 4;
+    tip.style.left = `${Math.min(Math.max(b.x - wb.x + b.width / 2, half), wb.width - half)}px`;
     tip.style.top = `${Math.min(b.y - wb.y, wrap.clientHeight * 0.5) - 7}px`;
     tip.classList.add('show');
   });
