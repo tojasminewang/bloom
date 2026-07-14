@@ -11,6 +11,7 @@ import { quickLogBox } from '../quicklog.js';
 import { ic } from '../icons.js';
 
 let selSkillId = null;
+const FREE = 'free'; // sentinel for "just focus" — a timer with no plant attached
 let selDur = 25;
 let selTab = 'focus'; // 'focus' | 'short' | 'long' — Pomofocus-style tabs; breaks run standalone
 let selShort = 5;
@@ -49,7 +50,7 @@ export function completeTimer() {
   const t = store.state.timer;
   if (!t) return;
   const sk = skillById(t.skillId);
-  const name = sk ? sk.name : 'your plant';
+  const name = sk ? sk.name : 'focus';
 
   if ((t.phase || 'work') === 'break') {
     if (t.mode !== 'cycle') {
@@ -85,11 +86,11 @@ export function completeTimer() {
       mode: 'cycle', phase: 'break', round: t.round || 1,
       startedAt: Date.now(), pausedAt: null, pausedTotal: 0,
     };
-    notifyBG('Session complete', `+${minutes}m to ${name} — ${Math.round(t.breakSec / 60)} minute break now`);
+    notifyBG('Session complete', `${sk ? `+${minutes}m to ${name}` : `+${minutes}m of focus`} — ${Math.round(t.breakSec / 60)} minute break now`);
   } else {
     store.state.timer = null;
     document.title = 'Bloom';
-    notifyBG('Session complete', `+${minutes}m to ${name} — lovely work.`);
+    notifyBG('Session complete', `${sk ? `+${minutes}m to ${name}` : `+${minutes}m of focus`} — lovely work.`);
   }
   sfx.chime();
   rain();
@@ -261,7 +262,7 @@ function openZen() {
 
     // the plant grows live: elapsed work minutes count as XP-in-progress
     const bonus = phase === 'work' ? Math.floor(timerElapsedSec() / 60) : 0;
-    const live = levelForXp(xpOf(tt.skillId) + bonus).level;
+    const live = skillById(tt.skillId) ? levelForXp(xpOf(tt.skillId) + bonus).level : 1;
     if (live !== zenLevel) {
       const grew = live > zenLevel && zenLevel !== 0;
       zenLevel = live;
@@ -361,7 +362,9 @@ export async function openPip() {
     const phase = tt.phase || 'work';
     const rem = timerRemaining();
     const progress = tt.durationSec > 0 ? 1 - rem / tt.durationSec : 1;
-    const sk = skillById(tt.skillId) || { name: 'break', icon: 'leaf', color: '#7FA98F', id: 'break', species: 'fern' };
+    const sk = skillById(tt.skillId) || (phase === 'break'
+      ? { name: 'break', icon: 'leaf', color: '#7FA98F', id: 'break', species: 'fern' }
+      : { name: 'focus', icon: 'hourglass', color: '#8FA35E', id: 'free', species: 'fern' });
     doc.body.classList.toggle('pip-dark', (document.documentElement.dataset.theme || 'light') === 'dark'); // follow live theme
     // the plant grows live: elapsed work minutes count as XP toward the next level
     if (sk) {
@@ -404,7 +407,8 @@ const RING_C = 2 * Math.PI * RING_R;
 
 function runningCard() {
   const t = store.state.timer;
-  const sk = skillById(t.skillId) || { name: '?', icon: 'sprout', color: '#8FA35E', id: 'x' };
+  const free = !skillById(t.skillId);
+  const sk = skillById(t.skillId) || { name: 'focus', icon: 'hourglass', color: '#8FA35E', id: 'x' };
   const phase = t.phase || 'work';
   const onBreak = phase === 'break';
 
@@ -441,14 +445,18 @@ function runningCard() {
     ? el('h2', {}, 'Paused')
     : onBreak
       ? el('h2', {}, 'Little ', el('em', {}, 'break'), ' ', ic('leaf', { size: 16, cls: 'title-ic' }))
-      : el('h2', {}, 'Growing ', el('em', {}, sk.name), ' ', el('span', { class: 'pulse-drop' }, ic('drop', { size: 16, cls: 'title-ic' })));
+      : free
+        ? el('h2', {}, 'Just ', el('em', {}, 'focusing'), ' ', ic('hourglass', { size: 16, cls: 'title-ic' }))
+        : el('h2', {}, 'Growing ', el('em', {}, sk.name), ' ', el('span', { class: 'pulse-drop' }, ic('drop', { size: 16, cls: 'title-ic' })));
   const subText = onBreak
     ? (t.mode !== 'cycle' ? 'just a breather — nothing gets logged'
       : t.round === 0 ? `warm-up break · ${sk.name} starts after this`
       : `round ${t.round || 1} done · back to ${sk.name} after this`)
     : t.mode === 'cycle'
       ? `round ${t.round || 1} · ${fmtMin(Math.round(t.workSec / 60))} work + ${fmtMin(Math.round(t.breakSec / 60))} break, repeating`
-      : `${fmtMin(Math.round(t.durationSec / 60))} session · every minute = 1 XP`;
+      : free
+        ? `${fmtMin(Math.round(t.durationSec / 60))} session · no plant, still counts toward your day`
+        : `${fmtMin(Math.round(t.durationSec / 60))} session · every minute = 1 XP`;
 
   return el('div', { class: 'card focus-hero' },
     makeTabs(onBreak ? (selTab === 'long' ? 'long' : 'short') : 'focus'),
@@ -474,8 +482,8 @@ function runningCard() {
 
 function setupCard() {
   const s = store.state;
-  if (selSkillId && !skillById(selSkillId)) selSkillId = null;
-  if (!selSkillId && s.skills.length) selSkillId = s.skills[s.skills.length - 1].id;
+  if (selSkillId && selSkillId !== FREE && !skillById(selSkillId)) selSkillId = null;
+  if (!selSkillId) selSkillId = s.skills.length ? s.skills[s.skills.length - 1].id : FREE;
 
   const chips = s.skills.map((sk) => el('button', {
     class: 'skill-chip' + (sk.id === selSkillId ? ' sel' : ''),
@@ -483,6 +491,12 @@ function setupCard() {
     dataset: { skill: sk.name },
     onClick: () => { selSkillId = sk.id; sfx.click(); store.notify(); },
   }, ic((sk.icon || 'sprout'), { size: 12 }), ` ${sk.name}`));
+  chips.push(el('button', {
+    class: 'skill-chip' + (selSkillId === FREE ? ' sel' : ''),
+    style: selSkillId === FREE ? { background: '#8FA35E' } : {},
+    dataset: { skill: 'just focus' }, title: 'Focus without a plant — minutes still count toward your day',
+    onClick: () => { selSkillId = FREE; sfx.click(); store.notify(); },
+  }, ic('hourglass', { size: 12 }), ' just focus'));
   chips.push(el('button', {
     class: 'skill-chip', onClick: async () => {
       const sk = await openSkillEditor();
@@ -509,10 +523,7 @@ function setupCard() {
 
   const startBtn = el('button', {
     class: 'btn btn-primary btn-big', id: 'timer-start-btn',
-    onClick: () => {
-      if (!selSkillId) { sfx.uhoh(); toast('Pick a plant to water first', 'pot'); return; }
-      startTimer(selSkillId, selDur);
-    },
+    onClick: () => startTimer(selSkillId === FREE ? null : selSkillId, selDur),
   }, '');
   refreshDur();
 
@@ -551,7 +562,9 @@ function setupCard() {
   return el('div', { class: 'card focus-hero' },
     tabRow,
     el('h2', {}, 'Grow some ', el('em', { class: 'squiggle' }, 'focus')),
-    el('p', { class: 'muted', style: { marginTop: '10px' } }, 'Pick a plant, pick a time. Every focused minute becomes XP.'),
+    el('p', { class: 'muted', style: { marginTop: '10px' } }, selSkillId === FREE
+      ? 'No plant this time — your minutes still count toward the day.'
+      : 'Pick a plant, pick a time. Every focused minute becomes XP.'),
     s.skills.length
       ? el('div', { class: 'skill-pick' }, ...chips)
       : el('div', { style: { margin: '16px 0' } },
@@ -580,7 +593,9 @@ function historyCard() {
       ? el('div', {}, ...sessions.map((sess) => {
           const sk = skillById(sess.skillId);
           return el('div', { class: 'session-row' },
-            sk ? el('span', { class: 'row', style: { gap: '6px' } }, ic((sk.icon || 'sprout'), { size: 13 }), sk.name) : el('span', {}, '(removed)'),
+            sk ? el('span', { class: 'row', style: { gap: '6px' } }, ic((sk.icon || 'sprout'), { size: 13 }), sk.name)
+               : sess.skillId ? el('span', {}, '(removed)')
+               : el('span', { class: 'row', style: { gap: '6px' } }, ic('hourglass', { size: 13 }), 'just focus'),
             el('span', { class: 'chip green' }, fmtMin(sess.minutes)),
             el('span', { class: 'muted small session-meta' }, `${fmtDateShort(sess.date)} · `, ic(sess.source === 'timer' ? 'hourglass' : 'pencil', { size: 11 }), sess.source === 'timer' ? ' timer' : ' logged'),
             el('span', { class: 'spacer' }),

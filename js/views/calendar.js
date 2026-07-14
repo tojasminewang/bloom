@@ -354,7 +354,8 @@ function dayPanel(rr) {
           ...[...focusBySkill].map(([skid, min]) => {
             const sk = skillById(skid);
             return el('div', { class: 'session-row' },
-              sk ? el('span', {class: 'row', style: {gap: '6px'}}, ic((sk.icon || 'sprout'), { size: 13 }), sk.name) : el('span', {}, 'unknown'),
+              sk ? el('span', {class: 'row', style: {gap: '6px'}}, ic((sk.icon || 'sprout'), { size: 13 }), sk.name)
+                 : el('span', {class: 'row', style: {gap: '6px'}}, ic('hourglass', { size: 13 }), skid ? 'unknown' : 'just focus'),
               el('span', { class: 'spacer' }),
               el('span', { class: 'chip green' }, fmtMin(min)));
           }),
