@@ -290,7 +290,9 @@ export const sfx = {
   click: () => { if (store.state.settings.taps === false) return; tok(620); },
   pop: () => { if (store.state.settings.taps === false) return; tok(523); tok(784, { t: 0.09, dur: 0.12 }); },
   start: () => { tok(440, { dur: 0.11 }); tok(587, { t: 0.11, dur: 0.14 }); },
-  chime: () => playRinger(),
+  // soft confirmation chime (sign-in, logged minutes) — the original gentle levels,
+  // deliberately NOT the timer ringer, which is louder and repeats
+  chime: () => [659, 784, 988, 1319].forEach((f, i) => tone(f, { t: i * 0.13, dur: 0.4, vol: 0.14 })),
   alarm: () => playRinger(null, 3), // timer's done — the ringer repeats so you actually hear it
   level: () => [523, 659, 784, 1047].forEach((f, i) => tok(f, { t: i * 0.09, dur: 0.22, vol: 0.07 })),
   uhoh: () => { tok(494, { dur: 0.11 }); tok(370, { t: 0.11, dur: 0.16 }); },
