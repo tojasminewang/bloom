@@ -148,7 +148,8 @@ async function pullGarden() {
 
 // how much real life a garden holds — an empty fresh browser must never outrank a real garden
 const substance = (s) => (s?.skills?.length || 0) + (s?.sessions?.length || 0)
-  + (s?.tasks?.length || 0) + (s?.notes?.length || 0) + (s?.events?.length || 0);
+  + (s?.tasks?.length || 0) + (s?.notes?.length || 0) + (s?.events?.length || 0)
+  + (s?.settings?.name ? 1 : 0); // even just a name is worth keeping
 
 // after sign-in (or on boot): a garden with actual plants beats an empty one,
 // no matter the timestamps; only between two real gardens does newest-edit win

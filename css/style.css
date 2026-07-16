@@ -661,6 +661,8 @@ details.done-details summary:hover { color: var(--ink); }
 .emoji-cell:hover { background: var(--card-2); transform: scale(1.15); }
 .emoji-cell.sel { border-color: var(--olive); background: var(--olive-soft); }
 .field-label { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.13em; color: var(--muted); margin: 15px 0 6px; }
+.save-hint { color: var(--olive-2); margin-left: 8px; opacity: 0; transition: opacity 0.3s ease; text-transform: none; letter-spacing: normal; }
+.save-hint.show { opacity: 1; }
 .field-label:first-child { margin-top: 0; }
 
 /* ============ quicklog ============ */

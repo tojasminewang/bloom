@@ -50,7 +50,21 @@ function cycleTheme() {
 // ---------- settings ----------
 function openSettings() {
   const s = store.state.settings;
-  const nameIn = el('input', { class: 'input', value: s.name, placeholder: 'Your name', maxlength: 24, onInput: (e) => { s.name = e.target.value.trim(); store.save(true); } });
+  const nameHint = el('span', { class: 'save-hint' }, ic('check', { size: 10 }), ' saved');
+  let nameT = null;
+  const nameIn = el('input', {
+    class: 'input', value: s.name, placeholder: 'Your name', maxlength: 24,
+    onInput: (e) => {
+      s.name = e.target.value.trim();
+      store.save(true);
+      clearTimeout(nameT);
+      nameT = setTimeout(() => {
+        store.notify(); // the "Good morning, name" greeting follows along behind the modal
+        nameHint.classList.add('show');
+        setTimeout(() => nameHint.classList.remove('show'), 1500);
+      }, 500);
+    },
+  });
 
   const themeRow = el('div', { class: 'row gap' });
   const themeChips = ['light', 'dark'].map((m) => el('button', {
@@ -232,7 +246,7 @@ function openSettings() {
     el('h2', {}, 'Settings'),
     el('div', { class: 'field-label' }, 'Account'),
     accountBox,
-    el('div', { class: 'field-label' }, 'Your name'),
+    el('div', { class: 'field-label' }, 'Your name', nameHint),
     nameIn,
     el('div', { class: 'field-label' }, 'Theme'),
     themeRow,
