@@ -261,9 +261,9 @@ export function render(root) {
   const signinBanner = (cloudConfigured() && !signedIn())
     ? el('div', { class: 'signin-banner' },
         ic('flower', { size: 15 }),
-        el('span', {}, 'Your garden lives only in this browser — ', el('strong', {}, 'sign in'), ' to keep it safe on every device.'),
+        el('span', {}, 'Sign in once and your plants, tasks, calendar and name follow you to any device.'),
         el('span', { class: 'spacer' }),
-        el('button', { class: 'btn btn-primary', onClick: () => window.dispatchEvent(new Event('bloom:open-settings')) }, 'Sign in'),
+        el('button', { class: 'btn btn-primary', onClick: () => window.dispatchEvent(new Event('bloom:open-settings')) }, 'Sign up / Sign in'),
       )
     : null;
 

@@ -178,7 +178,7 @@ function openSettings() {
       unsubStatus = cloud.onSyncStatus((s) => { statusChip.textContent = label(s); });
       accountBox.replaceChildren(
         el('p', { class: 'muted small', style: { marginBottom: '8px' } },
-          'Signed in as ', el('b', {}, cloud.userEmail()), ' — your garden saves to your account on every change.'),
+          'Signed in as ', el('b', {}, cloud.userEmail()), ' — plants, tasks, calendar, notes and your name all save to your account as you go. You stay signed in on this device.'),
         el('div', { class: 'row gap wrap', style: { alignItems: 'center' } },
           statusChip,
           el('button', { class: 'btn', id: 'account-signout', onClick: () => { cloud.signOut(); renderAccount(); } }, 'Sign out'),
@@ -188,7 +188,8 @@ function openSettings() {
     }
     // signed out: ask for email, send a sign-in link
     const emailIn = el('input', { class: 'input', type: 'email', id: 'account-email', placeholder: 'you@example.com', autocomplete: 'email' });
-    const msg = el('p', { class: 'muted small', style: { marginTop: '6px' } }, 'Sign in to keep your garden safe and use it on any device.');
+    const msg = el('p', { class: 'muted small', style: { marginTop: '6px' } },
+      'One account, every device — your plants, tasks, calendar, notes and name save automatically. New or returning, same button. You stay signed in on this device.');
     const sendBtn = el('button', {
       class: 'btn btn-primary', id: 'account-send',
       onClick: async () => {
@@ -233,7 +234,7 @@ function openSettings() {
           sendBtn.disabled = false;
         }
       },
-    }, 'Send sign-in link');
+    }, 'Sign up / Sign in');
     emailIn.addEventListener('keydown', (e) => { if (e.key === 'Enter') sendBtn.click(); });
     accountBox.replaceChildren(
       el('div', { class: 'row gap wrap' }, emailIn, sendBtn),

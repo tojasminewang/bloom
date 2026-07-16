@@ -97,14 +97,17 @@ export function handleAuthRedirect() {
 
 async function refreshSession() {
   if (!session?.refresh_token) return false;
-  const res = await fetch(`${CLOUD.url}/auth/v1/token?grant_type=refresh_token`, {
-    method: 'POST', headers: jsonHeaders(false),
-    body: JSON.stringify({ refresh_token: session.refresh_token }),
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok || !data.access_token) { saveSession(null); return false; }
-  saveSession(data);
-  return true;
+  try {
+    const res = await fetch(`${CLOUD.url}/auth/v1/token?grant_type=refresh_token`, {
+      method: 'POST', headers: jsonHeaders(false),
+      body: JSON.stringify({ refresh_token: session.refresh_token }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.access_token) { saveSession(data); return true; }
+    // sign out only when the token is definitively dead — hiccups keep you signed in
+    if ([400, 401, 403].includes(res.status)) saveSession(null);
+    return false;
+  } catch { return false; } // offline — stay signed in, try again next time
 }
 
 async function authedFetch(path, opts = {}, retry = true) {
@@ -180,5 +183,6 @@ const queuePush = () => {
 export function initCloud() {
   if (!cloudConfigured()) return;
   store.setOnSave(queuePush); // every save (silent or not) syncs shortly after
-  if (signedIn()) firstSync().catch(() => setStatus('error'));
+  // refresh the session on every visit so signing in is a once-per-device thing
+  if (signedIn()) refreshSession().finally(() => firstSync().catch(() => setStatus('error')));
 }
