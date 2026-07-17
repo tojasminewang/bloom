@@ -373,6 +373,9 @@ details.done-details summary:hover { color: var(--ink); }
 
 /* ============ notes ============ */
 .notes-wrap { display: grid; grid-template-columns: 290px 1fr; gap: 16px; align-items: start; }
+/* grid items refuse to shrink below content by default — the editor's inputs would
+   otherwise push the whole page wider than a phone screen */
+.notes-wrap > *, .grid-2 > *, .cal-wrap > * { min-width: 0; }
 .note-card {
   display: block; width: 100%; text-align: left; background: var(--card);
   border: 1.5px solid color-mix(in srgb, var(--note-color, #D89B8A) 45%, var(--line));
