@@ -184,5 +184,7 @@ export function initCloud() {
   if (!cloudConfigured()) return;
   store.setOnSave(queuePush); // every save (silent or not) syncs shortly after
   // refresh the session on every visit so signing in is a once-per-device thing
-  if (signedIn()) refreshSession().finally(() => firstSync().catch(() => setStatus('error')));
+  const done = () => window.dispatchEvent(new Event('bloom:first-sync-done'));
+  if (signedIn()) refreshSession().finally(() => firstSync().catch(() => setStatus('error')).finally(done));
+  else done();
 }

@@ -590,7 +590,16 @@ const authReturn = cloud.handleAuthRedirect(); // sign-in link lands here — mu
 buildSidebar();
 applyTheme();
 route();
-if (!authReturn) maybeOnboard(); // just signed in → their garden is about to sync down, don't onboard over it
+if (!authReturn) maybeOnboard();
+else {
+  // just signed in from the email link — wait for the cloud pull, then decide:
+  // returning gardener gets their garden, a brand-new one still needs name + first plant
+  window.addEventListener('bloom:first-sync-done', () => {
+    if (store.state.settings.onboarded) return;
+    if (!store.state.settings.name && !store.state.skills.length) maybeOnboard();
+    else { store.state.settings.onboarded = true; store.save(true); }
+  }, { once: true });
+}
 cloud.initCloud(); // account + sync, if configured
 initReminders(); // daily nudge to water the garden, if switched on
 syncMusic(); // gentle garden music, on by default (starts after first click per browser rules)
