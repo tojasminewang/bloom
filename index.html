@@ -43,5 +43,18 @@
       window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
     }
   </script>
+  <!-- GoatCounter analytics — privacy-friendly visit counts at jasmine.goatcounter.com.
+       no_onload + manual counting so each hash page (today/garden/focus…) counts separately. -->
+  <script>window.goatcounter = { no_onload: true };</script>
+  <script data-goatcounter="https://jasmine.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+  <script>
+    (function () {
+      var page = function () { return '/' + (location.hash.replace(/^#\/?/, '') || 'today'); };
+      var send = function () { if (window.goatcounter && window.goatcounter.count) window.goatcounter.count({ path: page() }); };
+      var first = function () { if (window.goatcounter && window.goatcounter.count) send(); else setTimeout(first, 400); };
+      window.addEventListener('hashchange', send);
+      first();
+    })();
+  </script>
 </body>
 </html>
