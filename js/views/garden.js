@@ -203,7 +203,7 @@ export function render(root) {
         topY = nr.top + (bb.y - vb.y) * (nr.height / vb.height);
       } catch { /* pre-paint — the estimate above is fine */ }
       sceneTip.style.left = `${gr.left - r.left + gr.width / 2}px`;
-      sceneTip.style.top = `${topY - r.top - 7}px`;
+      sceneTip.style.top = `${topY - r.top - 14}px`;
       sceneTip.classList.add('show');
     },
     onMouseleave: () => sceneTip.classList.remove('show'),
