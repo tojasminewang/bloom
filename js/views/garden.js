@@ -192,11 +192,18 @@ export function render(root) {
       sceneTip.textContent = `${g.dataset.name} · lv ${g.dataset.level}`;
       const r = banner.getBoundingClientRect();
       const gr = g.getBoundingClientRect();
-      // the plant art has empty sky above it; anchor near the leaves, higher for taller plants
-      const lvl = Math.min(+g.dataset.level || 1, 12);
-      const frac = Math.max(0.28, 0.56 - (lvl / 12) * 0.26);
+      // measure the drawn plant's real top (species differ in height at the same level)
+      // and float the tag a little above it — never on the art
+      let topY = gr.top + gr.height * 0.3;
+      const nested = g.querySelector('svg');
+      try {
+        const bb = nested.getBBox();
+        const vb = nested.viewBox.baseVal;
+        const nr = nested.getBoundingClientRect();
+        topY = nr.top + (bb.y - vb.y) * (nr.height / vb.height);
+      } catch { /* pre-paint — the estimate above is fine */ }
       sceneTip.style.left = `${gr.left - r.left + gr.width / 2}px`;
-      sceneTip.style.top = `${gr.top - r.top + gr.height * frac}px`;
+      sceneTip.style.top = `${topY - r.top - 7}px`;
       sceneTip.classList.add('show');
     },
     onMouseleave: () => sceneTip.classList.remove('show'),
