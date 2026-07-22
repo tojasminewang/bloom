@@ -14,6 +14,14 @@ let viewM = now.getMonth();
 let selected = todayYmd();
 let editingId = null;
 let dayMode = 'list'; // 'list' | 'plan' — how the day panel shows events (survives rerenders)
+let gridScroll = null, gridScrollDay = null; // timeline scroll position, kept across rerenders
+
+// a save from inside the timeline shouldn't fling the page back to the top
+function saveKeepScroll() {
+  const y = window.scrollY;
+  store.save();
+  setTimeout(() => window.scrollTo(0, y), 0);
+}
 const eventDraft = { title: '', time: '', ampm: 'pm', color: '#D89B8A', important: false };
 
 function eventsOn(date) {
@@ -373,7 +381,7 @@ function dayPanel(rr) {
     } else {
       store.state.events = store.state.events.filter((x) => x.id !== ev.id);
     }
-    store.save();
+    saveKeepScroll();
   }
 
   // ---- plan view: the full day as an hour timeline (tap a slot to add, drag a block to move) ----
@@ -520,7 +528,7 @@ function dayPanel(rr) {
           } else apply(t.ev);
         } else apply(t.ev);
         sfx.click();
-        store.save();
+        saveKeepScroll();
       });
       blk.addEventListener('pointercancel', () => {
         if (drag) cancelAnimationFrame(drag.raf);
@@ -559,11 +567,15 @@ function dayPanel(rr) {
         }, (ev.important ? '★ ' : '') + ev.title + ' · all day'))) : null,
       el('div', { class: 'day-grid-scroll' }, grid),
     );
-    // open the scroll on the first event (or 8am) so mornings aren't a wall of empty hours
+    // open where she left off; first visit of a day opens on its first event (or 8am)
     setTimeout(() => {
       const sc = wrap.querySelector('.day-grid-scroll');
-      const first = timed.length ? timed[0].start : 8 * 60;
-      sc.scrollTop = Math.max(0, ((first - startH * 60) / 60) * HOUR_PX - 24);
+      if (gridScrollDay === selected && gridScroll != null) sc.scrollTop = gridScroll;
+      else {
+        const first = timed.length ? timed[0].start : 8 * 60;
+        sc.scrollTop = Math.max(0, ((first - startH * 60) / 60) * HOUR_PX - 24);
+      }
+      sc.addEventListener('scroll', () => { gridScroll = sc.scrollTop; gridScrollDay = selected; });
     }, 30);
     return wrap;
   }
