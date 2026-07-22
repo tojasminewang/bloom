@@ -179,6 +179,7 @@ export function render(root) {
     ? gardenSceneSVG(skills.map((sk) => ({ sk, level: levelOf(sk.id).level })))
     : gardenBannerSVG({ seed: 'bloom-hills-0', trees: 10, flowers: 4 });
   const sceneTip = el('div', { class: 'scene-tip' });
+  let hoverPlant = null; // position the tag once per plant, not per mousemove
   const banner = el('div', {
     class: 'garden-banner' + (skills.length ? ' scene' : ''),
     onClick: (e) => {
@@ -188,19 +189,24 @@ export function render(root) {
     },
     onMousemove: (e) => {
       const g = e.target.closest('.scene-plant');
-      if (!g) { sceneTip.classList.remove('show'); return; }
+      if (!g) { sceneTip.classList.remove('show'); hoverPlant = null; return; }
+      if (g === hoverPlant && sceneTip.classList.contains('show')) return; // frozen while on the same plant — no mid-hop jiggle
+      hoverPlant = g;
       sceneTip.textContent = `${g.dataset.name} · lv ${g.dataset.level}`;
       const r = banner.getBoundingClientRect();
       const gr = g.getBoundingClientRect();
-      // an svg <g>'s client rect IS the drawn plant's on-screen box — no viewBox math,
-      // no letterboxing surprises. Tag floats above it with room for the 6px hover lift.
+      // an svg <g>'s client rect IS the drawn plant's on-screen box — no viewBox math.
+      // Normalize away any in-flight hover lift so the anchor is the resting position.
       const art = g.querySelector('.scene-lift') || g;
-      const topY = art.getBoundingClientRect().top;
+      let lift = 0;
+      const tf = getComputedStyle(art).transform;
+      if (tf && tf !== 'none') { const m = tf.match(/matrix\(([^)]+)\)/); if (m) lift = parseFloat(m[1].split(',')[5]) || 0; }
+      const topY = art.getBoundingClientRect().top - lift;
       sceneTip.style.left = `${gr.left - r.left + gr.width / 2}px`;
-      sceneTip.style.top = `${topY - r.top - 18}px`;
+      sceneTip.style.top = `${topY - r.top - 24}px`; // 18px air + the 6px hop
       sceneTip.classList.add('show');
     },
-    onMouseleave: () => sceneTip.classList.remove('show'),
+    onMouseleave: () => { sceneTip.classList.remove('show'); hoverPlant = null; },
   },
     el('div', { html: scene }),
     sceneTip,

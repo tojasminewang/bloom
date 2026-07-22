@@ -13,6 +13,7 @@ let viewY = now.getFullYear();
 let viewM = now.getMonth();
 let selected = todayYmd();
 let editingId = null;
+let dayMode = 'list'; // 'list' | 'plan' — how the day panel shows events (survives rerenders)
 const eventDraft = { title: '', time: '', ampm: 'pm', color: '#D89B8A', important: false };
 
 function eventsOn(date) {
@@ -347,10 +348,121 @@ function dayPanel(rr) {
   const focusBySkill = new Map();
   for (const s of sessions) focusBySkill.set(s.skillId, (focusBySkill.get(s.skillId) || 0) + s.minutes);
 
+  // ---- plan view: the day as an hour timeline (tap an empty slot to start an event there) ----
+  const HOUR_PX = 48;
+  function timelineEl() {
+    const h24v = store.state.settings.hour24;
+    const timed = evs.filter((ev) => ev.time).map((ev) => {
+      const [h, m] = ev.time.split(':').map(Number);
+      const start = h * 60 + m;
+      let end = start + 60; // no end time → assume an hour
+      if (ev.timeEnd) { const [eh, em] = ev.timeEnd.split(':').map(Number); end = eh * 60 + em; }
+      if (end <= start) end = start + 30;
+      return { ev, start, end };
+    }).sort((a, b) => a.start - b.start || b.end - a.end);
+    const allday = evs.filter((ev) => !ev.time);
+
+    const startH = Math.min(8, ...timed.map((t) => Math.floor(t.start / 60)));
+    const endH = Math.max(22, ...timed.map((t) => Math.ceil(t.end / 60)));
+
+    // overlapping events share the width, google-style: greedy columns per cluster
+    const colEnds = [];
+    for (const t of timed) {
+      let c = 0;
+      while (colEnds[c] > t.start) c++;
+      t.col = c;
+      colEnds[c] = t.end;
+    }
+    let cluster = [], clusterEnd = -1;
+    const closeCluster = () => {
+      const n = Math.max(0, ...cluster.map((t) => t.col)) + 1;
+      cluster.forEach((t) => { t.ncols = n; });
+      cluster = [];
+    };
+    for (const t of timed) {
+      if (cluster.length && t.start >= clusterEnd) closeCluster();
+      cluster.push(t);
+      clusterEnd = Math.max(clusterEnd, t.end);
+    }
+    if (cluster.length) closeCluster();
+
+    const grid = el('div', { class: 'day-grid', style: { height: `${(endH - startH) * HOUR_PX}px` } });
+    for (let h = startH; h <= endH; h++) {
+      grid.append(el('div', { class: 'dg-hour', style: { top: `${(h - startH) * HOUR_PX}px` } },
+        el('span', { class: 'dg-label' }, fmtTime(`${pad2(h % 24)}:00`, h24v).replace(':00', ''))));
+    }
+    for (const t of timed) {
+      const gap = 8;
+      grid.append(el('button', {
+        class: 'dg-ev' + (t.ev.important ? ' imp' : ''),
+        style: {
+          top: `${((t.start - startH * 60) / 60) * HOUR_PX + 1}px`,
+          height: `${Math.max(22, ((t.end - t.start) / 60) * HOUR_PX - 2)}px`,
+          left: `calc(56px + (100% - 56px - ${gap}px) * ${t.col / t.ncols})`,
+          width: `calc((100% - 56px - ${gap}px) / ${t.ncols} - 4px)`,
+          '--ev-c': t.ev.color || '#D89B8A',
+        },
+        title: 'Edit event',
+        onClick: (e) => { e.stopPropagation(); editingId = t.ev.id; sfx.click(); rr(); },
+      },
+        el('span', { class: 'dg-ev-t' }, (t.ev.important ? '★ ' : '') + t.ev.title),
+        el('span', { class: 'dg-ev-time' }, `${fmtTime(t.ev.time, h24v)}${t.ev.timeEnd ? ` – ${fmtTime(t.ev.timeEnd, h24v)}` : ''}`),
+      ));
+    }
+    if (selected === todayYmd()) {
+      const now = new Date();
+      const nowMin = now.getHours() * 60 + now.getMinutes();
+      if (nowMin >= startH * 60 && nowMin <= endH * 60) {
+        grid.append(el('div', { class: 'dg-now', style: { top: `${((nowMin - startH * 60) / 60) * HOUR_PX}px` } }));
+      }
+    }
+    // tap an empty slot → the form below starts right there (rounded to the half hour)
+    grid.addEventListener('click', (e) => {
+      if (e.target.closest('.dg-ev')) return;
+      const y = e.clientY - grid.getBoundingClientRect().top;
+      const mins = Math.round((startH * 60 + (y / HOUR_PX) * 60) / 30) * 30;
+      const H = Math.floor(mins / 60) % 24;
+      const M = mins % 60;
+      if (h24v) timeIn.value = `${pad2(H)}:${pad2(M)}`;
+      else {
+        timeIn.value = `${H % 12 || 12}:${pad2(M)}`;
+        ampm = H >= 12 ? 'pm' : 'am';
+        syncAmpm();
+      }
+      if (!editing) eventDraft.time = timeIn.value;
+      timeIn.dispatchEvent(new Event('input', { bubbles: true }));
+      sfx.click();
+      titleIn.focus();
+      toast(`Starting at ${fmtTime(`${pad2(H)}:${pad2(M)}`, h24v)} — name it below`, 'clock');
+    });
+    const wrap = el('div', { class: 'day-grid-wrap' },
+      allday.length ? el('div', { class: 'row gap wrap', style: { marginBottom: '8px' } },
+        ...allday.map((ev) => el('button', {
+          class: 'chip', style: { borderColor: ev.color }, onClick: () => { editingId = ev.id; sfx.click(); rr(); },
+        }, (ev.important ? '★ ' : '') + ev.title + ' · all day'))) : null,
+      el('div', { class: 'day-grid-scroll' }, grid),
+    );
+    // open the scroll on the first event (or 8am) so mornings aren't a wall of empty hours
+    setTimeout(() => {
+      const sc = wrap.querySelector('.day-grid-scroll');
+      const first = timed.length ? timed[0].start : 8 * 60;
+      sc.scrollTop = Math.max(0, ((first - startH * 60) / 60) * HOUR_PX - 24);
+    }, 30);
+    return wrap;
+  }
+
+  const modeChips = el('div', { class: 'row', style: { gap: '4px' } },
+    ...[['list', 'list'], ['plan', 'timeline']].map(([v, label]) => el('button', {
+      class: 'chip chip-btn' + (dayMode === v ? ' sel' : ''), dataset: { mode: v },
+      onClick: () => { if (dayMode !== v) { dayMode = v; sfx.click(); rr(); } },
+    }, label)));
+
   return el('div', { class: 'card day-panel' },
     el('h3', {}, label + fmtDate(selected)),
-    el('div', { class: 'field-label' }, 'Events'),
-    evs.length
+    el('div', { class: 'row', style: { alignItems: 'center' } },
+      el('div', { class: 'field-label', style: { flex: '1' } }, 'Events'),
+      modeChips),
+    dayMode === 'plan' ? timelineEl() : evs.length
       ? el('div', {}, ...evs.map((ev) => el('div', { class: 'event-row' },
           el('div', { class: 'event-bar', style: { background: ev.color } }),
           el('span', { class: 'event-time' }, ev.time
