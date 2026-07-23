@@ -55,43 +55,69 @@ function sparkles(topX, topY, L) {
 }
 
 // ---- species: classic bloom (leafy stem → flower) ----
+function bloomBud(x, y, r, c, P) {
+  const cup = `<path d="M${R(x)} ${R(y + r * 0.72)}
+    Q${R(x - r * 0.95)} ${R(y + r * 0.2)} ${R(x - r * 0.72)} ${R(y - r * 0.22)}
+    Q${R(x - r * 0.12)} ${R(y + r * 0.02)} ${R(x)} ${R(y + r * 0.52)}
+    Q${R(x + r * 0.18)} ${R(y + r * 0.02)} ${R(x + r * 0.78)} ${R(y - r * 0.2)}
+    Q${R(x + r * 0.96)} ${R(y + r * 0.25)} ${R(x)} ${R(y + r * 0.72)} Z"
+    fill="#67A84F"/>`;
+  return `<g>${cup}${bud(x, y, r, c, P)}</g>`;
+}
+
 function drawBloom(L, c, rnd, P) {
   let g = '';
-  const h = L === 1 ? 9 : Math.min(14 + L * 5.2, 76);
-  const lean = (rnd() - 0.5) * 5;
+  // Deliberate keyframes make every couple of levels feel like a real new stage:
+  // sprout → leafy shoot → glossy bud → open flower → branching bouquet.
+  const heights = [0, 10, 23, 32, 39, 47, 55, 60, 65, 69, 72, 74, 76];
+  const h = heights[L];
+  const lean = L === 1 ? 0 : (rnd() - 0.5) * 2.4;
   const topX = CX + lean, topY = SOIL - h;
-  const stemCol = '#55A86C';
+  const stemCol = '#5AA653';
 
   if (L >= 2) {
-    g += `<path d="M${CX} ${SOIL} C ${CX} ${R(SOIL - h * 0.45)}, ${R(topX)} ${R(SOIL - h * 0.6)}, ${R(topX)} ${R(topY)}" fill="none" stroke="${stemCol}" stroke-width="${L >= 7 ? 6 : 5}" stroke-linecap="round"/>`;
-  }
-  if (L >= 9) {
-    const sy = SOIL - h * 0.52;
-    g += `<path d="M${R(CX - 1)} ${R(sy)} Q ${R(CX - 13)} ${R(sy - 6)} ${R(CX - 19)} ${R(sy - 13)}" fill="none" stroke="${stemCol}" stroke-width="4" stroke-linecap="round"/>`;
-    g += flower(CX - 19, sy - 15, 6.4, c, P);
+    g += `<path d="M${CX} ${SOIL} C ${CX} ${R(SOIL - h * 0.42)}, ${R(topX)} ${R(SOIL - h * 0.7)}, ${R(topX)} ${R(topY + 1)}" fill="none" stroke="${stemCol}" stroke-width="${L >= 7 ? 5.4 : 4.6}" stroke-linecap="round"/>`;
   }
   if (L >= 10) {
-    const sy = SOIL - h * 0.34;
-    g += `<path d="M${R(CX + 1)} ${R(sy)} Q ${R(CX + 13)} ${R(sy - 4)} ${R(CX + 19)} ${R(sy - 10)}" fill="none" stroke="${stemCol}" stroke-width="4" stroke-linecap="round"/>`;
-    g += flower(CX + 19, sy - 12, 5.6, c, P);
+    const leftY = SOIL - h * 0.55;
+    const rightY = SOIL - h * 0.42;
+    const sideGrow = (L - 10) * 0.7;
+    g += `<path d="M${R(CX - 1)} ${R(leftY)} Q ${R(CX - 13)} ${R(leftY - 5)} ${R(CX - 22)} ${R(leftY - 14)}" fill="none" stroke="${stemCol}" stroke-width="3.8" stroke-linecap="round"/>`;
+    g += flower(CX - 23, leftY - 16, 5.8 + sideGrow, c, P);
+    g += `<path d="M${R(CX + 1)} ${R(rightY)} Q ${R(CX + 13)} ${R(rightY - 4)} ${R(CX + 22)} ${R(rightY - 13)}" fill="none" stroke="${stemCol}" stroke-width="3.8" stroke-linecap="round"/>`;
+    g += flower(CX + 23, rightY - 15, 5.3 + sideGrow, c, P);
+  }
+  if (L >= 12) {
+    const by = topY + 20;
+    g += `<path d="M${R(CX - 4)} ${R(by + 10)} Q${R(CX - 20)} ${R(by + 4)} ${R(CX - 29)} ${R(by - 2)}" fill="none" stroke="${stemCol}" stroke-width="2.8" stroke-linecap="round"/>`;
+    g += `<circle cx="${R(CX - 30)}" cy="${R(by - 3)}" r="2.6" fill="${shade(c, 8)}"/>`;
+    g += `<path d="M${R(CX + 4)} ${R(by + 7)} Q${R(CX + 21)} ${R(by + 2)} ${R(CX + 29)} ${R(by - 5)}" fill="none" stroke="${stemCol}" stroke-width="2.8" stroke-linecap="round"/>`;
+    g += `<circle cx="${R(CX + 30)}" cy="${R(by - 6)}" r="2.4" fill="${shade(c, 8)}"/>`;
   }
   if (L === 1) {
-    g += `<path d="M${CX} ${SOIL} L${CX} ${SOIL - 9}" stroke="${stemCol}" stroke-width="4.5" stroke-linecap="round"/>`;
-    g += leaf(CX, SOIL - 8, 13, -148, 103, 44, P);
-    g += leaf(CX, SOIL - 8, 13, -32, 112, 40, P);
+    g += `<path d="M${CX} ${SOIL} L${CX} ${SOIL - 9}" stroke="${stemCol}" stroke-width="4.2" stroke-linecap="round"/>`;
+    g += leaf(CX, SOIL - 8, 14.5, -150, 103, 44, P);
+    g += leaf(CX, SOIL - 8, 14.5, -30, 112, 40, P);
   } else {
-    const pairs = Math.min(1 + Math.floor(L / 2.6), 4);
+    const pairs = L <= 2 ? 1 : L <= 4 ? 2 : L <= 8 ? 3 : 4;
+    const positions = pairs === 1 ? [0.83]
+      : pairs === 2 ? [0.42, 0.78]
+      : pairs === 3 ? [0.3, 0.54, 0.76]
+      : [0.25, 0.43, 0.61, 0.77];
     for (let i = 0; i < pairs; i++) {
-      const t = 0.78 - i * 0.2;
+      const t = positions[i];
       const y = SOIL - h * t;
-      const x = CX + lean * (1 - t) * 0.6;
-      const len = Math.min(12 + L * 1.15, 24) * (1 - i * 0.12);
-      g += leaf(x, y, len, 180 + 34 + rnd() * 8, 100 + rnd() * 18, 42 + rnd() * 6, P);
-      g += leaf(x, y, len, -(34 + rnd() * 8), 100 + rnd() * 18, 42 + rnd() * 6, P);
+      const x = CX + lean * t;
+      const len = (13.5 + Math.min(L * 0.72, 6.5)) * (1 - i * 0.045);
+      g += leaf(x, y, len, 210 + i * 2.5, 105, 43, P);
+      g += leaf(x, y, len, -(30 + i * 2.5), 110, 43, P);
     }
   }
-  if (L >= 3 && L < 7) g += bud(topX, topY - 2, 4.2 + (L - 3) * 1.1, c, P);
-  if (L >= 7) g += flower(topX, topY - 3, 8 + (L - 7) * 0.9, c, P);
+  if (L >= 3 && L < 7) g += bloomBud(topX, topY - 2, 5.2 + (L - 3) * 1.05, c, P);
+  if (L >= 7) {
+    const flowerSizes = [7.2, 9.2, 10.4, 11.6, 12.7, 13.8];
+    g += flower(topX, topY - 3, flowerSizes[L - 7], c, P);
+  }
   g += sparkles(topX, topY, L);
   return g;
 }
@@ -207,7 +233,7 @@ function drawBonsai(L, c, rnd, P) {
 // ---- species: sunflower (tall stem, giant golden head) ----
 function drawSunflower(L, c, rnd, P) {
   let g = '';
-  const h = Math.min(16 + L * 5.8, 82);
+  const h = Math.min(16 + L * 5.8, 74); // cap keeps the big lv11-12 head petals inside the viewBox
   const lean = (rnd() - 0.5) * 4;
   const topX = CX + lean, topY = SOIL - h;
   const stemCol = '#4E9159';
