@@ -529,6 +529,8 @@ details.done-details summary:hover { color: var(--ink); }
 }
 .new-plant-card:hover { border-color: var(--olive); color: var(--olive-2); background: var(--olive-soft); }
 .new-plant-card .plus { font-size: 32px; }
+.new-plant-card.full { cursor: default; opacity: 0.75; }
+.new-plant-card.full:hover { border-color: var(--line-strong); color: var(--muted); background: transparent; }
 
 /* ============ garden banner + tiers (GOBE-style) ============ */
 .garden-banner {

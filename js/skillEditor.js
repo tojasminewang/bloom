@@ -9,7 +9,16 @@ import { sfx } from './audio.js';
 
 const ICONS = ['sprout', 'calc', 'book', 'code', 'globe', 'music', 'dumbbell', 'ball', 'palette', 'pencil', 'flask', 'cap', 'pan', 'gamepad', 'briefcase', 'film', 'camera', 'chat', 'heart', 'star', 'target', 'leaf', 'flower', 'pine'];
 
+// the meadow fits ten plants before it stops looking like a garden — gardens
+// already over the line keep working, they just can't add an eleventh
+export const MAX_PLANTS = 10;
+
 export function openSkillEditor(skill = null, { quiet = false } = {}) {
+  if (!skill && store.state.skills.length >= MAX_PLANTS) {
+    sfx.uhoh();
+    toast(`Your meadow is full — ${MAX_PLANTS} plants is the coziest it gets. Uproot one to make room.`, 'pot');
+    return Promise.resolve(null);
+  }
   return new Promise((resolve) => {
     let icon = skill?.icon || 'sprout';
     let species = skill?.species || 'bloom';

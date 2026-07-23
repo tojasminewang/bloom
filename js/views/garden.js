@@ -7,7 +7,7 @@ import { plantSVG, SPECIES } from '../plant.js';
 import { xpOf, levelOf, minutesTotal, weekMinutes, lastNDays, streak, skillById, gardenTier, stageName, KEEPSAKES } from '../progress.js';
 import { gardenBannerSVG, gardenSceneSVG } from '../banner.js';
 import { barChartSVG, dayLabels7 } from '../charts.js';
-import { openSkillEditor } from '../skillEditor.js';
+import { openSkillEditor, MAX_PLANTS } from '../skillEditor.js';
 import { setFocusSkill } from './focus.js';
 import { taskRow } from './tasks.js';
 import { selectNote } from './notes.js';
@@ -241,8 +241,11 @@ export function render(root) {
     skills.length
       ? el('div', { class: 'garden-grid' },
           ...skills.map((sk) => plantCard(sk, rr, sk.id === topSk?.id)),
-          el('button', { class: 'new-plant-card', onClick: () => openSkillEditor() },
-            el('span', { class: 'plus' }, ic('pot', { size: 30 })), 'Plant a new skill'),
+          skills.length >= MAX_PLANTS
+            ? el('div', { class: 'new-plant-card full', title: 'Uproot a plant to make room for a new one' },
+                el('span', { class: 'plus' }, ic('flower', { size: 26 })), `Meadow full — ${skills.length} plants`)
+            : el('button', { class: 'new-plant-card', onClick: () => openSkillEditor() },
+                el('span', { class: 'plus' }, ic('pot', { size: 30 })), 'Plant a new skill'),
         )
       : el('div', { class: 'card', style: { marginTop: '16px' } },
           el('div', { class: 'empty', style: { border: 'none' } },
