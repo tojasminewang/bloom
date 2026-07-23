@@ -433,7 +433,7 @@ struct PlantPainter {
     }
 
     private func drawSunflower(_ ctx: GraphicsContext, _ L: Int, _ c: String, _ rnd: inout PlantRandom) {
-        let h = min(16 + Double(L) * 5.8, 82)
+        let h = min(16 + Double(L) * 5.8, 74)   // cap keeps the big lv11-12 head inside the viewBox
         let lean = (rnd.next() - 0.5) * 4
         let topX = CX + lean, topY = SOIL - h
         let stemCol = Color(hex: "#4E9159")
