@@ -27,11 +27,20 @@ function bush(x, y, r, f) {
 }
 
 // ---- scenery garnish (all theme-aware; day/night pieces swap via CSS) ----
-function sunWithGlow(x, y) {
-  return `<circle cx="${x}" cy="${y}" r="44" fill="var(--hsun)" opacity="0.10"/>
-  <circle cx="${x}" cy="${y}" r="34" fill="var(--hsun)" opacity="0.16"/>
-  <circle cx="${x}" cy="${y}" r="26" fill="var(--hsun)"/>
-  <circle class="scene-night" cx="${x + 10}" cy="${y - 8}" r="21" fill="var(--hsky1)" opacity="0.92"/>`;
+function sunWithGlow(x, y, mid) {
+  return `<g class="scene-day">
+    <circle cx="${x}" cy="${y}" r="44" fill="var(--hsun)" opacity="0.10"/>
+    <circle cx="${x}" cy="${y}" r="34" fill="var(--hsun)" opacity="0.16"/>
+    <circle cx="${x}" cy="${y}" r="26" fill="var(--hsun)"/>
+  </g>
+  <g class="scene-night">
+    <mask id="${mid}">
+      <rect x="${x - 46}" y="${y - 46}" width="92" height="92" fill="#fff"/>
+      <circle cx="${x + 10}" cy="${y - 9}" r="20" fill="#000"/>
+    </mask>
+    <circle cx="${x}" cy="${y}" r="34" fill="var(--hsun)" opacity="0.07"/>
+    <circle cx="${x}" cy="${y}" r="24" fill="var(--hsun)" mask="url(#${mid})"/>
+  </g>`;
 }
 
 function cloud(x, y, sc, dur, delay) {
@@ -105,7 +114,7 @@ export function gardenBannerSVG({ seed = 'bloom-garden', trees = 10, flowers = 5
 
   let out = `<rect width="${W}" height="${H}" fill="url(#bloomsky)"/>`;
   out += stars(rnd, 14, W);
-  out += sunWithGlow(872, 46);
+  out += sunWithGlow(872, 46, 'moonbanner');
   out += cloud(180, 40, 0.9, 48, 0);
   out += cloud(560, 30, 0.6, 60, -20);
   out += bird(320, 52, 0.9);
@@ -146,7 +155,7 @@ export function gardenSceneSVG(plants) {
 
   let out = `<rect width="${W}" height="${H}" fill="url(#bloomsky2)"/>`;
   out += stars(rnd, 16, W);
-  out += sunWithGlow(872, 46);
+  out += sunWithGlow(872, 46, 'moonscene');
   out += cloud(170, 42, 1, 44, 0);
   out += cloud(520, 30, 0.7, 58, -18);
   out += cloud(760, 62, 0.55, 50, -32);
