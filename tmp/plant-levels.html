@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bloom — current plant level progression</title>
+  <style>
+    @font-face {
+      font-family: Fraunces;
+      src: url("/ios/Bloom/Fonts/Fraunces-Regular.ttf");
+    }
+    @font-face {
+      font-family: Quicksand;
+      src: url("/ios/Bloom/Fonts/Quicksand-Medium.ttf");
+    }
+    :root {
+      --cream: #f8f3e8;
+      --card: #fffdf8;
+      --ink: #3a422c;
+      --muted: #7d806c;
+      --line: #dcd8c7;
+      --sage: #7c8b4f;
+      --sage-soft: #e8ecd9;
+      --peach-soft: #f5e5da;
+      --lilac-soft: #eee8f6;
+      --gold-soft: #f6edcf;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; }
+    body {
+      width: 1440px;
+      padding: 28px 34px 34px;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 12% 0%, rgba(234, 208, 178, .32), transparent 28%),
+        radial-gradient(circle at 88% 4%, rgba(202, 215, 178, .35), transparent 25%),
+        var(--cream);
+      font-family: Quicksand, system-ui, sans-serif;
+    }
+    header {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 28px;
+      margin-bottom: 20px;
+    }
+    h1 {
+      margin: 0;
+      font: 38px/1.05 Fraunces, Georgia, serif;
+      letter-spacing: -.4px;
+    }
+    h1 em { color: var(--sage); font-weight: 400; }
+    .sub {
+      margin: 7px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .legend {
+      display: flex;
+      gap: 7px;
+      padding-bottom: 2px;
+      white-space: nowrap;
+    }
+    .pill {
+      padding: 5px 10px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .sprout { background: var(--sage-soft); }
+    .bud { background: var(--peach-soft); }
+    .bloom { background: var(--lilac-soft); }
+    .radiant { background: var(--gold-soft); }
+    .sheet {
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      background: rgba(255, 253, 248, .83);
+      box-shadow: 0 18px 45px rgba(76, 72, 52, .08);
+    }
+    .head, .species-row {
+      display: grid;
+      grid-template-columns: 150px repeat(12, 1fr);
+    }
+    .head {
+      min-height: 42px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(245, 241, 231, .76);
+    }
+    .head > div {
+      display: grid;
+      place-items: center;
+      border-left: 1px solid rgba(220, 216, 199, .7);
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .head .blank {
+      place-items: center start;
+      padding-left: 20px;
+      border-left: 0;
+      color: var(--ink);
+    }
+    .head .sprout { grid-column: 2 / span 2; }
+    .head .bud { grid-column: 4 / span 4; }
+    .head .bloom { grid-column: 8 / span 3; }
+    .head .radiant { grid-column: 11 / span 3; }
+    .species-row {
+      min-height: 142px;
+      border-bottom: 1px solid var(--line);
+    }
+    .species-row:last-child { border-bottom: 0; }
+    .species-name {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 0 18px;
+      border-right: 1px solid var(--line);
+    }
+    .species-name strong {
+      font: 21px/1.1 Fraunces, Georgia, serif;
+    }
+    .species-name span {
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: 10px;
+    }
+    .level {
+      position: relative;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      min-width: 0;
+      padding: 7px 0 20px;
+      border-right: 1px solid rgba(220, 216, 199, .48);
+    }
+    .level:last-child { border-right: 0; }
+    .level:nth-child(2), .level:nth-child(3) { background: rgba(232, 236, 217, .18); }
+    .level:nth-child(n+4):nth-child(-n+7) { background: rgba(245, 229, 218, .13); }
+    .level:nth-child(n+8):nth-child(-n+10) { background: rgba(238, 232, 246, .14); }
+    .level:nth-child(n+11) { background: rgba(246, 237, 207, .18); }
+    .level-label {
+      position: absolute;
+      right: 0;
+      bottom: 5px;
+      left: 0;
+      text-align: center;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 700;
+    }
+    .plant { display: block; }
+    .sway { transform-origin: 60px 102px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Every plant, <em>level by level</em></h1>
+      <p class="sub">Current in-app SVG artwork · levels cap visually at 12</p>
+    </div>
+    <div class="legend" aria-label="growth stages">
+      <span class="pill sprout">Sprout · 1–2</span>
+      <span class="pill bud">Bud · 3–6</span>
+      <span class="pill bloom">Bloom · 7–9</span>
+      <span class="pill radiant">Radiant · 10–12</span>
+    </div>
+  </header>
+  <main class="sheet">
+    <div class="head">
+      <div class="blank">Growth stage</div>
+      <div class="sprout">Sprout</div>
+      <div class="bud">Bud</div>
+      <div class="bloom">Bloom</div>
+      <div class="radiant">Radiant</div>
+    </div>
+    <div id="rows"></div>
+  </main>
+  <script type="module">
+    import { plantSVG, SPECIES } from "/js/plant.js";
+
+    const colors = {
+      bloom: "#C97F5F",
+      sunflower: "#E0B54F",
+      cactus: "#8FA35E",
+      fern: "#7FA98F",
+      bonsai: "#A9906E",
+    };
+    const notes = {
+      bloom: "leafy stem → flowers",
+      sunflower: "bud → golden head",
+      cactus: "arms → desert flower",
+      fern: "arching fronds → fiddlehead",
+      bonsai: "foliage clouds → blossoms",
+    };
+    const rows = document.querySelector("#rows");
+
+    for (const [key, species] of Object.entries(SPECIES)) {
+      const row = document.createElement("section");
+      row.className = "species-row";
+      row.innerHTML = `
+        <div class="species-name">
+          <strong>${species.label}</strong>
+          <span>${notes[key]}</span>
+        </div>
+        ${Array.from({ length: 12 }, (_, index) => {
+          const level = index + 1;
+          return `<div class="level">
+            ${plantSVG({ id: `sheet-${key}`, species: key, color: colors[key] }, level, 76)}
+            <div class="level-label">LV ${level}</div>
+          </div>`;
+        }).join("")}
+      `;
+      rows.append(row);
+    }
+  </script>
+</body>
+</html>
